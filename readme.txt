@@ -79,6 +79,40 @@ TCT adds `<link rel="alternate" type="application/json">` tags to your HTML page
 
 No. TCT only affects automated agents requesting JSON content. Your regular HTML pages remain unchanged.
 
+= How do I test if it's working? =
+
+Test with cURL:
+```bash
+# Fetch sitemap
+curl https://example.com/llm-sitemap.json
+
+# Fetch machine endpoint
+curl https://example.com/post-slug/llm/
+
+# Test conditional request (304 Not Modified)
+curl -I -H "If-None-Match: \"sha256-abc123...\"" https://example.com/post-slug/llm/
+```
+
+= Do I need to configure my firewall/CDN? =
+
+If using Cloudflare or WAF:
+- Allowlist `/llm-sitemap.json` and `/*/llm/` paths
+- Allow HEAD method (some WAFs block by default)
+- Don't strip ETag headers
+
+If using LiteSpeed Cache:
+- Exclude `/llm-sitemap.json` from caching (dynamic content)
+- Allow ETags to pass through
+
+= What about robots.txt? =
+
+Do NOT block `/llm*` paths if you want crawlers to discover endpoints:
+```
+User-agent: *
+Allow: /llm-sitemap.json
+Allow: /*/llm/
+```
+
 == Screenshots ==
 
 1. TCT Settings page - Configure optional trust extensions

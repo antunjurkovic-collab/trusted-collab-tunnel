@@ -58,6 +58,45 @@ add_filter('tct_build_payload', function($ret, $post, $c_url, $m_url){
 }, 10, 4);
 ```
 
+## Security Considerations
+
+**Before deploying to production, review [SECURITY.md](SECURITY.md) for complete security guidance.**
+
+### Key Security Points
+
+**Authentication:**
+- Default mode (`tct_auth_mode = off`) allows public access to machine endpoints
+- Use API key mode only for sensitive content: `tct_auth_mode = api_key`
+- API keys must be 32+ characters, cryptographically random, stored securely
+
+**HMAC Keys:**
+- Usage receipts require `tct_receipt_hmac_key` (32+ bytes minimum)
+- Never commit keys to version control
+- Rotate keys regularly (every 90 days recommended)
+
+**PII and Privacy:**
+- Machine JSON may contain personally identifiable information from post content
+- Review content before enabling TCT on posts with PII
+- Use `tct_build_payload` filter to redact sensitive data
+
+**Server Configuration:**
+- Enable HTTPS only (required for API keys and receipts)
+- Allowlist `/llm-sitemap.json` and `/*/llm/` in WAF/Cloudflare
+- Allow HEAD method (some WAFs block by default)
+- Configure robots.txt to permit `/llm*` paths
+
+**Responsible Disclosure:**
+- Security vulnerabilities: Email antunjurkovic@gmail.com with subject "SECURITY: TCT WordPress Plugin"
+- Do NOT open public issues for security bugs
+- See [SECURITY.md](SECURITY.md) for disclosure timeline
+
+## Licensing
+
+**Code License:** GPL v2+ (see [LICENSE](LICENSE))
+**Patent Rights:** See [PATENTS.md](PATENTS.md) for patent licensing information
+
+The GPL v2+ license covers the source code. Patent rights are a separate matter detailed in PATENTS.md.
+
 ## Notes
 - This directory is a reference implementation; drop it into `wp-content/plugins/` to run on a WP site.
 - For production, consider adding rewrite rules on activation; this reference uses `template_redirect` path interception.
