@@ -15,10 +15,10 @@ function tct_emit_policy_links() {
     $terms = tct_get_terms_url();
     $pricing = tct_get_pricing_url();
     if ($terms) {
-        header('Link: <' . esc_url_raw($terms) . '>; rel="terms"', false);
+        header('Link: <' . esc_url_raw($terms) . '>; rel="terms-of-service"', false);
     }
     if ($pricing) {
-        header('Link: <' . esc_url_raw($pricing) . '>; rel="pricing"', false);
+        header('Link: <' . esc_url_raw($pricing) . '>; rel="payment"', false);
     }
 }
 

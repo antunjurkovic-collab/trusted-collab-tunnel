@@ -156,10 +156,10 @@ function tct_output_llm_endpoint($canonical_path) {
     header('Content-Type: application/json; charset=UTF-8', true);
     header('Link: <' . esc_url_raw($c_url) . '>; rel="canonical"', false);
     header('ETag: "' . $hash . '"', true);
-    // Ensure server-level caches revalidate and do not serve stale 200s
-    header('Cache-Control: private, max-age=0, must-revalidate', true);
+    // Allow CDN/shared cache revalidation while maintaining freshness
+    header('Cache-Control: max-age=0, must-revalidate, stale-while-revalidate=60, stale-if-error=86400', true);
     header('X-LiteSpeed-Cache-Control: no-cache', false);
-    header('Vary: Accept', false);
+    header('Vary: Accept-Encoding', false);
     tct_emit_policy_links();
 
     // Conditional GET, precedence to If-None-Match
