@@ -40,11 +40,11 @@ Based on 970 URLs across 3 production sites:
 - Endpoint: `{canonical}/llm/` (configurable via `tct_endpoint_slug`)
 - Sitemap: `/llm-sitemap.json`
 - Manifest: `/llms.txt`
-- Headers on M_URL: `Link: <C_URL>; rel="canonical"`, `ETag: "sha256-…"`, `Cache-Control: max-age=0, must-revalidate`, `Vary: Accept`
+- Headers on M_URL: `Link: <C_URL>; rel="canonical"`, `ETag: "sha256-…"`, `Cache-Control: max-age=0, must-revalidate, stale-while-revalidate=60, stale-if-error=86400`, `Vary: Accept-Encoding`
 - Conditional GET: honors `If-None-Match` and returns `304` (no body) on match; works for HEAD and GET
 
 ## Optional Trust Extensions (off by default)
-- Policy links: `Link: <…>; rel="terms"`, `Link: <…>; rel="pricing"` (set options `tct_terms_url`, `tct_pricing_url`)
+- Policy links: `Link: <…>; rel="terms-of-service"`, `Link: <…>; rel="payment"` (set options `tct_terms_url`, `tct_pricing_url`) — Note: for backward compatibility, the plugin also accepts legacy `rel="terms"` and `rel="pricing"` from origin
 - Auth: `tct_auth_mode = off|api_key`, with `tct_api_keys = ["key1","key2"]`
 - Usage receipts: `AI-Usage-Receipt: contract=…; status=200|304; bytes=…; etag="…"; ts=…; sig=base64(hmac)` when `tct_receipts_enabled = 1` and `tct_receipt_hmac_key` set
 
