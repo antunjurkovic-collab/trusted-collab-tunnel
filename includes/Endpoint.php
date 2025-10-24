@@ -159,7 +159,7 @@ function tct_output_llm_endpoint($canonical_path) {
     // Allow CDN/shared cache revalidation while maintaining freshness
     header('Cache-Control: max-age=0, must-revalidate, stale-while-revalidate=60, stale-if-error=86400', true);
     header('X-LiteSpeed-Cache-Control: no-cache', false);
-    header('Vary: Accept-Encoding', false);
+    header('Vary: Accept-Encoding', true);
     tct_emit_policy_links();
 
     // Conditional GET, precedence to If-None-Match
@@ -344,6 +344,7 @@ function tct_build_full_payload($post, $c_url, $m_url, $hash) {
     $slug = $post ? $post->post_name : null;
 
     $payload = [
+        'profile' => 'tct-1',
         'llm_url' => $m_url,
         'canonical_url' => $c_url,
         'post_id' => $post ? intval($post->ID) : null,

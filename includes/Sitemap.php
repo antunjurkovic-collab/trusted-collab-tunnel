@@ -45,6 +45,7 @@ function tct_output_sitemap() {
     }
     $out = [
         'version' => 1,
+        'profile' => 'tct-1',
         'items' => $items,
     ];
     echo wp_json_encode($out, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
