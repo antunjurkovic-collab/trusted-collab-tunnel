@@ -43,6 +43,39 @@ Based on 970 URLs across 3 production sites:
 - Headers on M_URL: `Link: <C_URL>; rel="canonical"`, `ETag: "sha256-…"`, `Cache-Control: max-age=0, must-revalidate, stale-while-revalidate=60, stale-if-error=86400`, `Vary: Accept-Encoding`
 - Conditional GET: honors `If-None-Match` and returns `304` (no body) on match; works for HEAD and GET
 
+### M-URL JSON Response Format
+
+```json
+{
+  "profile": "tct-1",
+  "llm_url": "https://example.com/post/llm/",
+  "canonical_url": "https://example.com/post/",
+  "hash": "sha256-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "title": "Post Title",
+  "content": {"text": "Article content..."},
+  "modified": "2025-10-23T18:00:00Z"
+}
+```
+
+**Profile Field:** The `"profile": "tct-1"` field enables protocol versioning. Future versions (e.g., `tct-2`) can introduce new fields while maintaining backward compatibility.
+
+### Sitemap JSON Format
+
+```json
+{
+  "version": 1,
+  "profile": "tct-1",
+  "items": [
+    {
+      "cUrl": "https://example.com/post/",
+      "mUrl": "https://example.com/post/llm/",
+      "modified": "2025-10-23T18:00:00Z",
+      "contentHash": "sha256-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}
+```
+
 ## Optional Trust Extensions (off by default)
 - Policy links: `Link: <…>; rel="terms-of-service"`, `Link: <…>; rel="payment"` (set options `tct_terms_url`, `tct_pricing_url`) — Note: for backward compatibility, the plugin also accepts legacy `rel="terms"` and `rel="pricing"` from origin
 - Auth: `tct_auth_mode = off|api_key`, with `tct_api_keys = ["key1","key2"]`
