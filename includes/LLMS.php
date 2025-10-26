@@ -81,16 +81,43 @@ function tct_llms_build_content() {
     }
     $lines[] = '';
 
+    // Machine-readable policy descriptor
+    $lines[] = '## Machine-Readable Policy';
+    $lines[] = '- ' . home_url('/llm-policy.json') . ' - Policy descriptor (JSON)';
+    $lines[] = '';
+    $lines[] = 'The policy descriptor provides structured information about:';
+    $lines[] = '- Allowed purposes (AI input, training, search indexing)';
+    $lines[] = '- Requirements (attribution, notice)';
+    $lines[] = '- Advisory rate limits';
+    $lines[] = '';
+
     if ($include_policies) {
-        $lines[] = '## Policies';
+        $lines[] = '## Human-Readable Policies';
         if (!empty($terms)) {
             $lines[] = '- ' . $terms . ' - Terms / AI Policy';
         }
         if (!empty($pricing)) {
             $lines[] = '- ' . $pricing . ' - Pricing';
         }
+        $contact = get_option('tct_contact_url', '');
+        if (!empty($contact)) {
+            $lines[] = '- ' . $contact . ' - Contact';
+        }
         $lines[] = '';
     }
+
+    // AI Preferences (aligned with emerging standards)
+    $ai_input = get_option('tct_allow_ai_input', true) ? 'allowed' : 'prohibited';
+    $ai_train = get_option('tct_allow_ai_train', false) ? 'allowed' : 'prohibited';
+    $search = get_option('tct_allow_search', true) ? 'allowed' : 'prohibited';
+
+    $lines[] = '## AI Preferences';
+    $lines[] = '# Aligned with emerging standards (Cloudflare Content Signals, IETF AIPREF)';
+    $lines[] = '# These values mirror the policy JSON';
+    $lines[] = '- AI-Input: ' . $ai_input;
+    $lines[] = '- AI-Train: ' . $ai_train;
+    $lines[] = '- Search: ' . $search;
+    $lines[] = '';
 
     $lines[] = '_AI agents: prefer `{canonical}/' . $endpoint . '/` per-page JSON and the LLM sitemap for discovery._';
 

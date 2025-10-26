@@ -24,6 +24,7 @@ define('TCT_PLUGIN_URL', plugin_dir_url(__FILE__));
 
 require_once TCT_PLUGIN_DIR . 'includes/Hashing.php';
 require_once TCT_PLUGIN_DIR . 'includes/Policy.php';
+require_once TCT_PLUGIN_DIR . 'includes/PolicyDescriptor.php';
 require_once TCT_PLUGIN_DIR . 'includes/Auth.php';
 require_once TCT_PLUGIN_DIR . 'includes/Receipt.php';
 require_once TCT_PLUGIN_DIR . 'includes/Endpoint.php';
@@ -66,6 +67,10 @@ register_activation_hook(__FILE__, function() {
     add_option('tct_llms_post_types', array('post','page'));
     add_option('tct_llms_include_xml_sitemap', 1);
     add_option('tct_llms_include_policies', 1);
+    // Initialize policy descriptor defaults
+    if (function_exists('tct_init_policy_defaults')) {
+        tct_init_policy_defaults();
+    }
     // Ensure rewrites are registered on first activation
     if (function_exists('flush_rewrite_rules')) { flush_rewrite_rules(); }
 });
@@ -90,6 +95,7 @@ add_action('init', function() {
     add_rewrite_rule('^llm-sitemap\\.json$', 'index.php?tct_sitemap=1', 'top');
     add_rewrite_rule('^llm-manifest\\.json$', 'index.php?tct_manifest=1', 'top');
     add_rewrite_rule('^llms\\.txt$', 'index.php?tct_llms=1', 'top');
+    add_rewrite_rule('^llm-policy\\.json$', 'index.php?tct_policy=1', 'top');
     add_rewrite_rule('^llm-stats\\.json$', 'index.php?tct_stats=1', 'top');
     add_rewrite_rule('^llm-changes\\.json$', 'index.php?tct_changes=1', 'top');
 });
@@ -100,6 +106,7 @@ add_filter('query_vars', function($vars) {
     if (is_array($vars)) { $vars[] = 'tct_sitemap'; }
     if (is_array($vars)) { $vars[] = 'tct_manifest'; }
     if (is_array($vars)) { $vars[] = 'tct_llms'; }
+    if (is_array($vars)) { $vars[] = 'tct_policy'; }
     if (is_array($vars)) { $vars[] = 'tct_stats'; }
     if (is_array($vars)) { $vars[] = 'tct_changes'; }
     return $vars;

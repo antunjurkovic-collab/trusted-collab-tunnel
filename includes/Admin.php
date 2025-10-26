@@ -25,7 +25,7 @@ function tct_render_settings_page() {
         $action = sanitize_text_field($_POST['tct_action']);
 
         if ($action === 'save') {
-            tct_update_option_bool('tct_llms_virtual_enabled');
+            // Virtual endpoint always enabled (no checkbox, defaults to on)
             tct_update_option_bool('tct_llms_include_samples');
             tct_update_option_bool('tct_llms_include_xml_sitemap');
             tct_update_option_bool('tct_llms_include_policies');
@@ -46,6 +46,24 @@ function tct_render_settings_page() {
             $hmac = sanitize_text_field($_POST['tct_receipt_hmac_key'] ?? '');
             update_option('tct_receipt_hmac_key', $hmac);
 
+            // Policy Descriptor settings
+            update_option('tct_contact_url', esc_url_raw($_POST['tct_contact_url'] ?? ''));
+            tct_update_option_bool('tct_allow_ai_input');
+            tct_update_option_bool('tct_allow_ai_train');
+            tct_update_option_bool('tct_allow_search');
+            tct_update_option_bool('tct_require_attribution');
+            tct_update_option_bool('tct_require_linkback');
+            tct_update_option_bool('tct_require_notice');
+            $rps = max(0, intval($_POST['tct_rate_hint_rps'] ?? 0));
+            update_option('tct_rate_hint_rps', $rps);
+            $daily = max(1, intval($_POST['tct_rate_hint_daily'] ?? 10000));
+            update_option('tct_rate_hint_daily', $daily);
+
+            // Update policy timestamp when settings change
+            if (function_exists('tct_update_policy_timestamp')) {
+                tct_update_policy_timestamp();
+            }
+
             $notice = 'Settings saved.';
         } elseif ($action === 'generate') {
             $ok = tct_llms_generate_static(false);
@@ -64,7 +82,7 @@ function tct_render_settings_page() {
     $exists = file_exists($path);
     $mod = $exists ? @filemtime($path) : 0;
 
-    $virtual_enabled = (int) get_option('tct_llms_virtual_enabled', 1) === 1;
+    // Virtual endpoint always enabled (managed by rewrite rules)
     $include_samples = (int) get_option('tct_llms_include_samples', 1) === 1;
     $include_xml = (int) get_option('tct_llms_include_xml_sitemap', 1) === 1;
     $include_policies = (int) get_option('tct_llms_include_policies', 1) === 1;
@@ -76,17 +94,40 @@ function tct_render_settings_page() {
     $receipts_enabled = (int) get_option('tct_receipts_enabled', 0) === 1;
     $receipt_key = (string) get_option('tct_receipt_hmac_key', '');
 
+    // Policy Descriptor values
+    $contact_url = get_option('tct_contact_url', '');
+    $allow_ai_input = (int) get_option('tct_allow_ai_input', 1) === 1;
+    $allow_ai_train = (int) get_option('tct_allow_ai_train', 0) === 1;
+    $allow_search = (int) get_option('tct_allow_search', 1) === 1;
+    $require_attribution = (int) get_option('tct_require_attribution', 1) === 1;
+    $require_linkback = (int) get_option('tct_require_linkback', 0) === 1;
+    $require_notice = (int) get_option('tct_require_notice', 1) === 1;
+    $rate_hint_rps = (int) get_option('tct_rate_hint_rps', 0);
+    $rate_hint_daily = (int) get_option('tct_rate_hint_daily', 10000);
+
     ?>
     <div class="wrap">
       <h1>Trusted Collaboration Tunnel</h1>
       <?php if ($notice): ?><div class="updated"><p><?php echo esc_html($notice); ?></p></div><?php endif; ?>
 
-      <h2>llms.txt</h2>
-      <p><strong>Status:</strong>
-        Path: <code><?php echo esc_html($path); ?></code>
-        <?php if ($exists): ?> | File exists<?php if ($mod) echo ' (modified ' . esc_html(date('Y-m-d H:i', $mod)) . ')'; ?><?php else: ?> | Not found<?php endif; ?>
-        | Owner: <?php echo $owned ? '<span style="color:green">TCT</span>' : '<span style="color:#a00">Other/Unknown</span>'; ?>
-      </p>
+      <h2>TCT Endpoints Status</h2>
+      <div style="background:#e7f3ff;border-left:4px solid #2271b1;padding:12px;margin-bottom:16px;">
+        <strong>✓ TCT is active for all post types</strong><br>
+        <small>JSON endpoints are automatically created for all posts, pages, and custom post types. The sitemap includes all published content. No configuration needed!</small>
+      </div>
+
+      <h2>llms.txt Configuration (settings)</h2>
+      <?php if ($exists): ?>
+        <div style="background:#fff3cd;border-left:4px solid #ffc107;padding:12px;margin-bottom:16px;">
+          <strong>⚠️ Static file detected:</strong> <code><?php echo esc_html($path); ?></code><br>
+          <small>Last modified: <?php echo $mod ? esc_html(date('Y-m-d H:i', $mod)) : 'Unknown'; ?> | Owner: <?php echo $owned ? '<span style="color:green">TCT</span>' : '<span style="color:#a00">Other/Unknown</span>'; ?></small><br>
+          <small><strong>Note:</strong> Static files are served by your web server and may show outdated content. Virtual mode always stays current.</small>
+        </div>
+      <?php else: ?>
+        <div style="background:#d4edda;border-left:4px solid #28a745;padding:12px;margin-bottom:16px;">
+          <strong>✓ Using virtual endpoint</strong> - Your /llms.txt is always up-to-date automatically.
+        </div>
+      <?php endif; ?>
 
       <form method="post">
         <?php wp_nonce_field('tct_settings'); ?>
@@ -94,69 +135,158 @@ function tct_render_settings_page() {
 
         <table class="form-table" role="presentation">
           <tr>
-            <th scope="row">Enable virtual /llms.txt</th>
+            <th scope="row">Include sample endpoints in llms.txt</th>
             <td>
-              <label><input type="checkbox" name="tct_llms_virtual_enabled" <?php checked($virtual_enabled); ?>> Serve virtual guide at /llms.txt</label>
-            </td>
-          </tr>
-          <tr>
-            <th scope="row">Include sample endpoints</th>
-            <td>
-              <label><input type="checkbox" name="tct_llms_include_samples" <?php checked($include_samples); ?>> List recent posts/pages</label>
-              &nbsp;Count: <input type="number" min="1" max="100" name="tct_llms_sample_count" value="<?php echo esc_attr($sample_count); ?>" style="width:80px">
-              &nbsp;Post types: <input type="text" name="tct_llms_post_types" value="<?php echo esc_attr(implode(',', $post_types)); ?>" style="width:220px">
+              <label><input type="checkbox" name="tct_llms_include_samples" <?php checked($include_samples); ?>> Show sample endpoints in /llms.txt file</label><br>
+              <small style="margin-left:20px;">Sample count: <input type="number" min="1" max="100" name="tct_llms_sample_count" value="<?php echo esc_attr($sample_count); ?>" style="width:80px"></small><br>
+              <small style="margin-left:20px;">Post types for samples: <input type="text" name="tct_llms_post_types" value="<?php echo esc_attr(implode(',', $post_types)); ?>" style="width:220px" placeholder="post,page"></small><br>
+              <small style="color:#666;margin-left:20px;"><em>Note: This only controls which samples appear in /llms.txt. The sitemap and endpoints work for all post types automatically.</em></small>
             </td>
           </tr>
           <tr>
             <th scope="row">Include XML sitemap link</th>
-            <td><label><input type="checkbox" name="tct_llms_include_xml_sitemap" <?php checked($include_xml); ?>> Add /sitemap_index.xml link</label></td>
+            <td>
+              <label><input type="checkbox" name="tct_llms_include_xml_sitemap" <?php checked($include_xml); ?>> Add /sitemap_index.xml link to llms.txt</label><br>
+              <small style="color:#666;margin-left:20px;">Adds a link to your WordPress XML sitemap in the llms.txt file (optional)</small>
+            </td>
           </tr>
           <tr>
             <th scope="row">Policies (terms/pricing)</th>
             <td>
               <label><input type="checkbox" name="tct_llms_include_policies" <?php checked($include_policies); ?>> Include policy links</label><br>
-              Terms/Policy URL: <input type="url" name="tct_terms_url" value="<?php echo esc_attr($terms); ?>" size="50"><br>
-              Pricing URL: <input type="url" name="tct_pricing_url" value="<?php echo esc_attr($pricing); ?>" size="50">
+              <small style="color:#666;margin-left:20px;display:block;margin-bottom:8px;">
+                <strong>What this does:</strong> Adds policy URLs to three places:<br>
+                • <strong>llms.txt</strong> - Human-readable section<br>
+                • <strong>HTTP Link headers</strong> - AI crawlers see <code>rel="terms-of-service"</code> and <code>rel="payment"</code><br>
+                • <strong>Policy JSON</strong> - Structured data at /llm-policy.json<br>
+                <em>Use this to inform AI systems about your usage policies and pricing.</em>
+              </small>
+              Terms/Policy URL: <input type="url" name="tct_terms_url" value="<?php echo esc_attr($terms); ?>" size="50" placeholder="https://example.com/ai-policy/"><br>
+              <small style="color:#666;margin-left:20px;">Your AI usage policy, terms of service, or guidelines (optional)</small><br>
+              Pricing URL: <input type="url" name="tct_pricing_url" value="<?php echo esc_attr($pricing); ?>" size="50" placeholder="https://example.com/pricing/"><br>
+              <small style="color:#666;margin-left:20px;">If you charge for commercial AI access (optional - leave empty if free)</small>
             </td>
           </tr>
           <tr>
             <th scope="row">Usage receipts (optional)</th>
             <td>
               <label><input type="checkbox" name="tct_receipts_enabled" <?php checked($receipts_enabled); ?>> Emit AI-Usage-Receipt on 200/304</label><br>
-              HMAC key: <input type="text" name="tct_receipt_hmac_key" value="<?php echo esc_attr($receipt_key); ?>" size="50"><br>
-              <small>Clients send <code>X-AI-Contract: YOUR-ID</code>. Receipt header includes contract, status, bytes, ETag, timestamp, and base64 HMAC signature.</small>
+              <small style="color:#666;margin-left:20px;display:block;margin-bottom:8px;">
+                <strong>What this does:</strong> Sends cryptographically signed receipts in HTTP headers.<br>
+                • AI crawlers send <code>X-AI-Contract: THEIR-ID</code> with requests<br>
+                • Your site responds with <code>AI-Usage-Receipt</code> header containing: contract ID, status code, bytes served, ETag, timestamp, and signature<br>
+                • Creates audit trail of what was accessed and when<br>
+                <strong>When to use:</strong> For formal agreements with AI companies, billing, or tracking specific crawlers.<br>
+                <strong>Most sites:</strong> Leave this disabled unless you have commercial agreements requiring usage tracking.<br>
+                <em>Not included in llms.txt - HTTP headers only.</em>
+              </small>
+              HMAC key: <input type="text" name="tct_receipt_hmac_key" value="<?php echo esc_attr($receipt_key); ?>" size="50" placeholder="32+ character secret key"><br>
+              <small style="color:#666;margin-left:20px;">Secret key for signing receipts (32+ characters, never commit to git). Crawlers can verify signatures to prove authenticity.</small>
             </td>
           </tr>
         </table>
 
-        <p class="submit"><button type="submit" class="button button-primary">Save Settings</button></p>
+        <p class="submit"><button type="submit" class="button button-primary">Save llms.txt Settings</button></p>
       </form>
 
-      <h3>Static File Controls</h3>
-      <form method="post" style="display:inline-block;margin-right:10px">
+      <details style="margin-top:24px;margin-bottom:32px;border:1px solid #ddd;padding:12px;border-radius:4px;">
+        <summary style="cursor:pointer;font-weight:600;margin-bottom:8px;">Advanced: Static File (llms.txt) Controls</summary>
+        <p style="margin:12px 0;color:#666;">
+          <strong>When to use:</strong> Only needed if your web server has issues serving virtual endpoints (rare).
+          Virtual mode (default) is recommended as it always stays synchronized with your settings.
+        </p>
+
+        <?php if ($exists && $owned): ?>
+          <p><strong>Current static file:</strong> Managed by TCT (safe to update or remove)</p>
+          <form method="post" style="display:inline-block;margin-right:10px">
+            <?php wp_nonce_field('tct_settings'); ?>
+            <input type="hidden" name="tct_action" value="generate">
+            <button type="submit" class="button button-primary">Update Static File</button>
+            <small style="display:block;margin-top:4px;color:#666;">Regenerate with current settings</small>
+          </form>
+          <form method="post" style="display:inline-block">
+            <?php wp_nonce_field('tct_settings'); ?>
+            <input type="hidden" name="tct_action" value="remove">
+            <button type="submit" class="button" onclick="return confirm('Switch back to virtual endpoint?')">Remove Static File</button>
+            <small style="display:block;margin-top:4px;color:#666;">Switch to virtual mode (recommended)</small>
+          </form>
+
+        <?php elseif ($exists && !$owned): ?>
+          <p style="color:#d63638;"><strong>⚠️ Warning:</strong> Static file exists but not managed by TCT</p>
+          <form method="post" style="display:inline-block">
+            <?php wp_nonce_field('tct_settings'); ?>
+            <input type="hidden" name="tct_action" value="overwrite">
+            <button type="submit" class="button button-secondary" onclick="return confirm('This will backup the existing file and replace it. Continue?')">Take Over File (Backup &amp; Replace)</button>
+            <small style="display:block;margin-top:4px;color:#666;">Creates backup before replacing</small>
+          </form>
+
+        <?php else: ?>
+          <p><strong>No static file:</strong> Currently using virtual mode (recommended)</p>
+          <form method="post" style="display:inline-block">
+            <?php wp_nonce_field('tct_settings'); ?>
+            <input type="hidden" name="tct_action" value="generate">
+            <button type="submit" class="button">Create Static File</button>
+            <small style="display:block;margin-top:4px;color:#666;">Only if virtual mode doesn't work on your server</small>
+          </form>
+        <?php endif; ?>
+      </details>
+
+      <h2>AI Policy Settings</h2>
+      <p>Define how AI systems can use your content. Machine-readable policy at <code>/llm-policy.json</code> helps AI crawlers understand your preferences.</p>
+
+      <form method="post">
         <?php wp_nonce_field('tct_settings'); ?>
-        <input type="hidden" name="tct_action" value="generate">
-        <button type="submit" class="button">Generate static llms.txt</button>
-      </form>
-      <form method="post" style="display:inline-block;margin-right:10px">
-        <?php wp_nonce_field('tct_settings'); ?>
-        <input type="hidden" name="tct_action" value="overwrite">
-        <button type="submit" class="button button-secondary">Overwrite &amp; take over (backup if not ours)</button>
-      </form>
-      <form method="post" style="display:inline-block">
-        <?php wp_nonce_field('tct_settings'); ?>
-        <input type="hidden" name="tct_action" value="remove">
-        <button type="submit" class="button" onclick="return confirm('Remove static llms.txt (only if owned by TCT)?')">Remove static llms.txt</button>
+        <input type="hidden" name="tct_action" value="save">
+
+        <table class="form-table" role="presentation">
+          <tr>
+            <th scope="row">Contact URL</th>
+            <td>
+              <input type="url" name="tct_contact_url" value="<?php echo esc_attr($contact_url); ?>" size="50" placeholder="https://example.com/contact"><br>
+              <small>Where AI systems can reach you for questions/notifications</small>
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Permitted AI Purposes</th>
+            <td>
+              <label><input type="checkbox" name="tct_allow_ai_input" <?php checked($allow_ai_input); ?>> Allow AI Input</label>
+              <small>(AI assistants, chatbots - content used for inference)</small><br>
+              <label><input type="checkbox" name="tct_allow_ai_train" <?php checked($allow_ai_train); ?>> Allow AI Training</label>
+              <small>(Model fine-tuning, dataset inclusion)</small><br>
+              <label><input type="checkbox" name="tct_allow_search" <?php checked($allow_search); ?>> Allow Search Indexing</label>
+              <small>(Perplexity, Bing, Google, etc.)</small>
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">AI Usage Requirements</th>
+            <td>
+              <label><input type="checkbox" name="tct_require_attribution" <?php checked($require_attribution); ?>> Require Attribution</label>
+              <small>(Cite your site when using content)</small><br>
+              <label><input type="checkbox" name="tct_require_linkback" <?php checked($require_linkback); ?>> Require Link-Back</label>
+              <small>(Must link to original page)</small><br>
+              <label><input type="checkbox" name="tct_require_notice" <?php checked($require_notice); ?>> Require Notice</label>
+              <small>(Inform you before major use)</small>
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Advisory Rate Limits</th>
+            <td>
+              Max requests/second: <input type="number" min="0" max="1000" name="tct_rate_hint_rps" value="<?php echo esc_attr($rate_hint_rps); ?>" style="width:80px"> <small>(0 = no limit)</small><br>
+              Max requests/day: <input type="number" min="1" max="1000000" name="tct_rate_hint_daily" value="<?php echo esc_attr($rate_hint_daily); ?>" style="width:120px"><br>
+              <small>Advisory only (honor system). Helps AI systems plan crawl schedules.</small>
+            </td>
+          </tr>
+        </table>
+
+        <p class="submit"><button type="submit" class="button button-primary">Save AI Policy Settings</button></p>
       </form>
 
-      <h3 style="margin-top:24px">Reference Implementation</h3>
+      <h3 style="margin-top:32px">Reference Implementation</h3>
       <p>See a complete, production TCT implementation with real measurements and validation:</p>
       <p><a href="https://llmpages.org/" target="_blank" class="button button-primary">Visit llmpages.org &rarr;</a></p>
       <ul style="margin-top:12px;">
-        <li><strong>Real Data:</strong> 83% bandwidth, 86% tokens, 90%+ skip rate (970+ URLs)</li>
         <li><strong>Live Validator:</strong> <a href="https://llmpages.org/validator/" target="_blank">llmpages.org/validator</a></li>
         <li><strong>Documentation:</strong> Integration guides, FAQ, developer docs</li>
-        <li><strong>Production Sites:</strong> wellbeing-support.com, galaxybilliard.club (10/10 scores)</li>
       </ul>
     </div>
     <?php

@@ -27,6 +27,10 @@ function tct_handle_requests() {
         tct_output_llms_txt();
         exit;
     }
+    if (get_query_var('tct_policy')) {
+        tct_output_policy_json();
+        exit;
+    }
     if (get_query_var('tct_stats')) {
         tct_output_stats_json();
         exit;
@@ -52,6 +56,11 @@ function tct_handle_requests() {
     // 3) llms.txt (path match fallback)
     if ($req_path === $llms_path) {
         tct_output_llms_txt();
+        exit;
+    }
+    // 3.5) Policy descriptor (path match fallback)
+    if ($req_path === '/llm-policy.json') {
+        tct_output_policy_json();
         exit;
     }
     // 4) Stats + Changes (path fallback)
@@ -83,19 +92,31 @@ function tct_output_llm_endpoint($canonical_path) {
     $c_url = home_url($canonical_path);
     $m_url = home_url(trailingslashit($canonical_path) . trailingslashit(trim(get_option('tct_endpoint_slug', 'llm'))));
 
-    // Lookup post by URL
+    // VALIDATION: Only serve endpoints for content pages (not archives)
     $post = null;
     $post_id = url_to_postid($c_url);
+
     if ($post_id) {
+        // Valid content page (post/page/CPT)
         $post = get_post($post_id);
     } else {
-        // If front page is a static page, use it
+        // Check if it's homepage
         if (untrailingslashit($c_url) === untrailingslashit(home_url('/'))) {
             $front_id = (int) get_option('page_on_front');
             if ($front_id) {
+                // Static homepage
                 $post = get_post($front_id);
+            } else {
+                // Blog list homepage - synthesize content
+                $post = tct_create_homepage_pseudo_post();
             }
         }
+    }
+
+    // If no valid post found, this is an archive page or invalid URL
+    if (!$post) {
+        status_header(404);
+        exit;
     }
 
     // Allow another plugin (e.g., llm-pages) to provide payload and hash
@@ -161,6 +182,10 @@ function tct_output_llm_endpoint($canonical_path) {
     header('X-LiteSpeed-Cache-Control: no-cache', false);
     header('Vary: Accept-Encoding', true);
     tct_emit_policy_links();
+
+    // AI Policy Descriptor (IANA-registered rel="describedby")
+    $policy_url = home_url('/llm-policy.json');
+    header('Link: <' . esc_url_raw($policy_url) . '>; rel="describedby"; type="application/json"', false);
 
     // Conditional GET, precedence to If-None-Match
     $inm = isset($_SERVER['HTTP_IF_NONE_MATCH']) ? trim((string)$_SERVER['HTTP_IF_NONE_MATCH']) : '';
@@ -305,7 +330,7 @@ function tct_build_full_payload($post, $c_url, $m_url, $hash) {
 
     // Categories (if present on the post)
     $categories = null;
-    if ($post) {
+    if ($post && $post->post_type !== 'homepage') {
         $cats = get_the_category($post->ID);
         if (is_array($cats) && !empty($cats)) {
             $categories = [];
@@ -323,7 +348,7 @@ function tct_build_full_payload($post, $c_url, $m_url, $hash) {
 
     // Tags (if present)
     $tagsArr = null;
-    if ($post) {
+    if ($post && $post->post_type !== 'homepage') {
         $tags = get_the_tags($post->ID);
         if (is_array($tags) && !empty($tags)) {
             $tagsArr = [];
@@ -374,4 +399,52 @@ function tct_build_full_payload($post, $c_url, $m_url, $hash) {
         $payload = apply_filters('tct_full_payload', $payload, $post, $c_url, $m_url);
     }
     return $payload;
+}
+
+function tct_create_homepage_pseudo_post() {
+    $site_name = get_bloginfo('name');
+    $site_desc = get_bloginfo('description');
+    $sitemap_url = home_url('/llm-sitemap.json');
+
+    // Get recent posts for featured section
+    $recent = get_posts([
+        'posts_per_page' => 5,
+        'post_status' => 'publish',
+        'orderby' => 'date',
+        'order' => 'DESC',
+    ]);
+
+    // Build synthetic homepage content
+    $content = "{$site_name}\n\n";
+    if ($site_desc) {
+        $content .= "{$site_desc}\n\n";
+    }
+
+    if (!empty($recent)) {
+        $content .= "Recent Content:\n";
+        foreach ($recent as $p) {
+            $title = get_the_title($p);
+            $content .= "- {$title}\n";
+        }
+        $content .= "\n";
+    }
+
+    $content .= "For complete content, visit the LLM sitemap: {$sitemap_url}";
+
+    // Create pseudo-post object that behaves like a real post
+    $pseudo = new stdClass();
+    $pseudo->ID = 0;
+    $pseudo->post_title = $site_name;
+    $pseudo->post_content = $content;
+    $pseudo->post_excerpt = $site_desc;
+    $pseudo->post_type = 'homepage';
+    $pseudo->post_status = 'publish';
+    $pseudo->post_author = 0;
+    $pseudo->post_date = current_time('mysql');
+    $pseudo->post_date_gmt = current_time('mysql', 1);
+    $pseudo->post_modified = current_time('mysql');
+    $pseudo->post_modified_gmt = current_time('mysql', 1);
+    $pseudo->post_name = 'homepage';
+
+    return $pseudo;
 }

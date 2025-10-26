@@ -81,6 +81,101 @@ Based on 970 URLs across 3 production sites:
 - Auth: `tct_auth_mode = off|api_key`, with `tct_api_keys = ["key1","key2"]`
 - Usage receipts: `AI-Usage-Receipt: contract=…; status=200|304; bytes=…; etag="…"; ts=…; sig=base64(hmac)` when `tct_receipts_enabled = 1` and `tct_receipt_hmac_key` set
 
+## AI Policy Descriptor (AIPREF Alignment)
+
+**NEW:** Machine-readable policy at `/llm-policy.json` aligned with IETF AIPREF working group priorities.
+
+### Policy Descriptor JSON
+
+Every M-URL now includes a Link header pointing to the policy descriptor:
+
+```http
+Link: </llm-policy.json>; rel="describedby"; type="application/json"
+```
+
+The policy descriptor provides structured information about AI usage preferences:
+
+```json
+{
+  "profile": "tct-policy-1",
+  "version": 1,
+  "effective": "2025-10-25T10:00:00Z",
+  "updated": "2025-10-25T10:00:00Z",
+  "policy_urls": {
+    "terms_of_service": "https://example.com/terms",
+    "payment_info": "https://example.com/pricing",
+    "contact": "https://example.com/contact"
+  },
+  "purposes": {
+    "allow_ai_input": true,
+    "allow_ai_train": false,
+    "allow_search_indexing": true
+  },
+  "requirements": {
+    "attribution_required": true,
+    "link_back_required": false,
+    "notice_required": true
+  },
+  "rate_hints": {
+    "max_requests_per_second": null,
+    "max_requests_per_day": 10000,
+    "note": "Advisory limits, honor system"
+  },
+  "extensions": {}
+}
+```
+
+### Configuration
+
+Configure via **WordPress Admin → Settings → TCT → AI Policy Descriptor**:
+
+- **Contact URL**: Where AI systems can reach you
+- **Permitted AI Purposes**:
+  - AI Input (assistants, chatbots) — Default: enabled
+  - AI Training (model fine-tuning) — Default: disabled
+  - Search Indexing (Perplexity, Bing, Google) — Default: enabled
+- **AI Usage Requirements**:
+  - Attribution Required — Default: enabled
+  - Link-Back Required — Default: disabled
+  - Notice Required — Default: enabled
+- **Advisory Rate Limits**:
+  - Max requests/second (0 = no limit)
+  - Max requests/day (default: 10,000)
+
+### llms.txt Integration
+
+The policy descriptor is automatically referenced in `/llms.txt`:
+
+```
+## Machine-Readable Policy
+- https://example.com/llm-policy.json - Policy descriptor (JSON)
+
+The policy descriptor provides structured information about:
+- Allowed purposes (AI input, training, search indexing)
+- Requirements (attribution, notice)
+- Advisory rate limits
+
+## AI Preferences
+# Aligned with emerging standards (Cloudflare Content Signals)
+- AI-Input: allowed
+- AI-Train: prohibited
+- Search: allowed
+```
+
+**Note**: If using a static llms.txt file, regenerate it after changing policy settings to ensure the AI Preferences section reflects your current configuration. The virtual endpoint (recommended) always stays in sync automatically.
+
+### AIPREF Alignment
+
+This implementation follows IETF AIPREF working group priorities:
+
+- ✅ Uses IANA-registered `rel="describedby"` (not custom relations)
+- ✅ Vocabulary-agnostic design ready for AIPREF finalization (August 2025)
+- ✅ Extensions object for future standards mapping
+- ✅ Explicit versioning with `tct-policy-1` profile
+- ✅ Compatible with Cloudflare Content Signals (ai-input, ai-train, search)
+
+**Note**: Policy defaults favor restrictive settings (AI Input: yes, Training: no) aligned with publisher interests.
+
 ## Integration with llm-pages (optional)
 If another plugin can provide the JSON payload and content hash, hook:
 
