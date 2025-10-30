@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Core LLM Endpoint Delivery** - Deterministic JSON endpoints at `{canonical}/llm/` pattern
 - **JSON Sitemap** - `/llm-sitemap.json` with sitemap-first discovery (cUrl, mUrl, modified, contentHash)
 - **Template-Invariant SHA256 Hashing** - Content fingerprinting immune to theme/template changes
-- **ETag & 304 Discipline** - Strong ETag generation with proper `If-None-Match` conditional GET support
+- **ETag & 304 Discipline** - Weak ETag generation with proper `If-None-Match` conditional GET support
 - **llms.txt Manifest** - Human-readable guide at `/llms.txt` (virtual or static)
 - **JSON Manifest** - Machine-readable capabilities declaration at `/llm-manifest.json`
 - **Optional API Key Authentication** - Bearer token or X-API-Key header support
