@@ -6,9 +6,22 @@ function tct_output_sitemap() {
 
     $endpoint = trim(get_option('tct_endpoint_slug', 'llm'));
     // Collect recent posts/pages (publish). Sites can filter this query.
+    // Default behavior: exclude WooCommerce 'product' CPT and the Shop page.
+    $public = get_post_types(['public' => true], 'names');
+    $default_excluded = apply_filters('tct_sitemap_excluded_post_types', ['product']);
+    if (!is_array($default_excluded)) { $default_excluded = ['product']; }
+    $post_types = array_values(array_diff($public, $default_excluded));
+
+    $post_not_in = [];
+    if (function_exists('wc_get_page_id')) {
+        $shop_id = (int) wc_get_page_id('shop');
+        if ($shop_id > 0) { $post_not_in[] = $shop_id; }
+    }
+
     $qargs = [
-        'post_type' => 'any',
+        'post_type' => $post_types,
         'post_status' => 'publish',
+        'post__not_in' => $post_not_in,
         'posts_per_page' => 200,
         'orderby' => 'modified',
         'order' => 'DESC',
@@ -29,9 +42,8 @@ function tct_output_sitemap() {
         // Static homepage - use actual page content
         $home_post = get_post($front_id);
         if ($home_post) {
-            $html = apply_filters('the_content', $home_post->post_content);
-            $html = '<h1>' . esc_html(get_the_title($home_post)) . '</h1>' . $html;
-            $normalized = tct_normalize_text($html);
+            $content_string = tct_build_content_string($home_post);
+            $normalized = tct_normalize_text($content_string);
             $hash = tct_compute_fingerprint($normalized);
             $modified = get_post_modified_time('c', true, $home_post);
 
@@ -46,7 +58,9 @@ function tct_output_sitemap() {
         // Blog list homepage - use synthetic content
         if (function_exists('tct_create_homepage_pseudo_post')) {
             $pseudo = tct_create_homepage_pseudo_post();
-            $normalized = tct_normalize_text($pseudo->post_content);
+            // Build authoritative content string for parity with endpoint
+            $content_string = tct_build_content_string($pseudo);
+            $normalized = tct_normalize_text($content_string);
             $hash = tct_compute_fingerprint($normalized);
             $modified = gmdate('c', strtotime($pseudo->post_modified_gmt));
 
@@ -73,9 +87,8 @@ function tct_output_sitemap() {
             $hash = $filtered['hash'];
         }
         if (!$hash) {
-            $html = apply_filters('the_content', $post->post_content);
-            $html = '<h1>' . esc_html(get_the_title($post)) . '</h1>' . $html;
-            $normalized = tct_normalize_text($html);
+            $content_string = tct_build_content_string($post);
+            $normalized = tct_normalize_text($content_string);
             $hash = tct_compute_fingerprint($normalized);
         }
         $items[] = [

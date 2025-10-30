@@ -119,6 +119,22 @@ function tct_output_llm_endpoint($canonical_path) {
         exit;
     }
 
+    // Block specific post types (default: product) until supported
+    $blocked = apply_filters('tct_block_post_types', ['product']);
+    if ($post && is_array($blocked) && in_array($post->post_type, $blocked, true)) {
+        status_header(404);
+        exit;
+    }
+
+    // Also block WooCommerce shop page (archive-like) until explicitly supported
+    if (function_exists('wc_get_page_id')) {
+        $shop_id = wc_get_page_id('shop');
+        if ($shop_id && $post && (int) $post->ID === (int) $shop_id) {
+            status_header(404);
+            exit;
+        }
+    }
+
     // Allow another plugin (e.g., llm-pages) to provide payload and hash
     $payload = null;
     $hash = null;
@@ -128,18 +144,9 @@ function tct_output_llm_endpoint($canonical_path) {
         $hash = $filtered['hash'];
     }
 
-    // Compute normalized fingerprint from the actual article content so 304s match visible text
-    $html = '';
-    if ($post) {
-        $html = apply_filters('the_content', $post->post_content);
-        // Fallback if filters strip content
-        if (!is_string($html) || trim($html) === '') {
-            $html = (string) $post->post_content;
-        }
-        $html = '<h1>' . esc_html(get_the_title($post)) . '</h1>' . $html;
-    }
-    $normalized = tct_normalize_text($html);
-    // Always compute hash from actual content for consistency with sitemap
+    // Build authoritative content string (plain text) and compute hash
+    $content_string = tct_build_content_string($post);
+    $normalized = tct_normalize_text($content_string);
     $computed_hash = tct_compute_fingerprint($normalized);
     // Use computed hash to ensure sitemap and endpoint always match
     $hash = $computed_hash;
@@ -149,7 +156,7 @@ function tct_output_llm_endpoint($canonical_path) {
 
     // If another component supplied a payload, merge in content if missing or empty
     if (is_array($payload)) {
-        if (!isset($payload['content']) || empty($payload['content']) || empty($payload['content']['text'])) {
+        if (!isset($payload['content']) || $payload['content'] === '' || $payload['content'] === null) {
             $payload['content'] = $full['content'];
         }
         if (!isset($payload['excerpt']) || empty($payload['excerpt'])) {
@@ -176,7 +183,7 @@ function tct_output_llm_endpoint($canonical_path) {
     // Common headers for both HEAD and GET
     header('Content-Type: application/json; charset=UTF-8', true);
     header('Link: <' . esc_url_raw($c_url) . '>; rel="canonical"', false);
-    header('ETag: "' . $hash . '"', true);
+    header('ETag: W/"' . $hash . '"', true);
     // Allow CDN/shared cache revalidation while maintaining freshness
     header('Cache-Control: max-age=0, must-revalidate, stale-while-revalidate=60, stale-if-error=86400', true);
     header('X-LiteSpeed-Cache-Control: no-cache', false);
@@ -238,12 +245,9 @@ function tct_build_full_payload($post, $c_url, $m_url, $hash) {
         if (!is_string($html_raw) || trim($html_raw) === '') {
             $html_raw = (string) $post->post_content;
         }
-        $plain = wp_strip_all_tags($html_raw, true);
-        $plain = html_entity_decode($plain, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $plain = preg_replace('/\s+/u', ' ', $plain);
-        $plain = trim($plain);
-        $wc = str_word_count($plain);
-        $content_text = $plain;
+        // Build authoritative content string and derive word count from it
+        $content_text = tct_build_content_string($post);
+        $wc = str_word_count($content_text);
     }
     // Excerpt: prefer WP excerpt cleaned; fallback to first sentence of the content text
     $excerpt = $post ? wp_strip_all_tags(get_the_excerpt($post), true) : '';
@@ -387,7 +391,7 @@ function tct_build_full_payload($post, $c_url, $m_url, $hash) {
         'headings' => !empty($headings) ? $headings : null,
         'categories' => $categories,
         'tags' => $tagsArr,
-        'content' => [ 'text' => $content_text ],
+        'content' => $content_text,
     ];
     // Allow site owners to force full content regardless of third-party filters
     $force = (int) get_option('tct_force_full_content', 1) === 1;
