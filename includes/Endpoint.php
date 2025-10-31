@@ -180,21 +180,8 @@ function tct_output_llm_endpoint($canonical_path) {
         exit;
     }
 
-    // Common headers for both HEAD and GET
-    header('Content-Type: application/json; charset=UTF-8', true);
-    header('Link: <' . esc_url_raw($c_url) . '>; rel="canonical"', false);
-    header('ETag: W/"' . $hash . '"', true);
-    // Allow CDN/shared cache revalidation while maintaining freshness
-    header('Cache-Control: max-age=0, must-revalidate, stale-while-revalidate=60, stale-if-error=86400', true);
-    header('X-LiteSpeed-Cache-Control: no-cache', false);
-    header('Vary: Accept-Encoding', true);
-    tct_emit_policy_links();
-
-    // AI Policy Descriptor (IANA-registered rel="describedby")
-    $policy_url = home_url('/llm-policy.json');
-    header('Link: <' . esc_url_raw($policy_url) . '>; rel="describedby"; type="application/json"', false);
-
-    // Conditional GET, precedence to If-None-Match
+    // CRITICAL: Check conditional GET BEFORE setting caching headers
+    // This prevents caching layers from interfering with 304 logic
     $inm = isset($_SERVER['HTTP_IF_NONE_MATCH']) ? trim((string)$_SERVER['HTTP_IF_NONE_MATCH']) : '';
     $match_inm = false;
     if ($inm) {
@@ -206,12 +193,30 @@ function tct_output_llm_endpoint($canonical_path) {
         }
     }
     if ($match_inm) {
+        // Emit minimal headers for 304 response
+        header('Content-Type: application/json; charset=UTF-8', true);
+        header('ETag: W/"' . $hash . '"', true);
+        header('Cache-Control: max-age=0, must-revalidate, stale-while-revalidate=60, stale-if-error=86400, public', true);
         status_header(304);
         // Stats and optional receipt on 304
         if (function_exists('tct_stats_record')) { tct_stats_record($m_url, 304, 0); }
         if (tct_receipts_enabled()) { tct_emit_usage_receipt($hash, 304, 0); }
         exit;
     }
+
+    // Common headers for both HEAD and GET
+    header('Content-Type: application/json; charset=UTF-8', true);
+    header('Link: <' . esc_url_raw($c_url) . '>; rel="canonical"', false);
+    header('ETag: W/"' . $hash . '"', true);
+    // Allow CDN/shared cache revalidation while maintaining freshness
+    header('Cache-Control: max-age=0, must-revalidate, stale-while-revalidate=60, stale-if-error=86400, public', true);
+    header('X-LiteSpeed-Cache-Control: no-cache', false);
+    header('Vary: Accept-Encoding', true);
+    tct_emit_policy_links();
+
+    // AI Policy Descriptor (IANA-registered rel="describedby")
+    $policy_url = home_url('/llm-policy.json');
+    header('Link: <' . esc_url_raw($policy_url) . '>; rel="describedby"; type="application/json"', false);
 
     if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'HEAD') {
         status_header(200);
