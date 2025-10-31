@@ -153,6 +153,9 @@ register_activation_hook(__FILE__, function() {
     add_option('tct_endpoint_slug', 'llm');
     add_option('tct_sitemap_path', '/llm-sitemap.json');
     // Default manifest path moved to JSON to avoid colliding with llms.txt
+    
+    // CRITICAL: Add .htaccess rules to prevent LiteSpeed caching M-URLs
+    tct_add_htaccess_rules();
     add_option('tct_manifest_path', '/llm-manifest.json');
     // New: public path for human-readable llms.txt
     add_option('tct_llms_path', '/llms.txt');
@@ -215,4 +218,79 @@ add_filter('query_vars', function($vars) {
     if (is_array($vars)) { $vars[] = 'tct_stats'; }
     if (is_array($vars)) { $vars[] = 'tct_changes'; }
     return $vars;
+});
+
+// Add .htaccess rules to prevent server-level caching of M-URLs
+function tct_add_htaccess_rules() {
+    $htaccess_file = ABSPATH . '.htaccess';
+    
+    // Check if .htaccess exists and is writable
+    if (!file_exists($htaccess_file)) {
+        return; // Can't add rules if file doesn't exist
+    }
+    
+    if (!is_writable($htaccess_file)) {
+        return; // Can't modify if not writable
+    }
+    
+    $htaccess_content = file_get_contents($htaccess_file);
+    
+    // Check if our rules are already present
+    if (strpos($htaccess_content, '# BEGIN Trusted Collaboration Tunnel') !== false) {
+        return; // Rules already added
+    }
+    
+    $endpoint = trim(get_option('tct_endpoint_slug', 'llm'));
+    
+    $rules = <<<HTACCESS
+
+# BEGIN Trusted Collaboration Tunnel
+# These rules prevent server-level caching of M-URLs to enable 304 Not Modified responses
+<IfModule LiteSpeed>
+  # Bypass LiteSpeed cache for TCT endpoints
+  RewriteEngine On
+  RewriteCond %{REQUEST_URI} /{$endpoint}/$ [OR]
+  RewriteCond %{REQUEST_URI} /llm-sitemap\.json$ [OR]
+  RewriteCond %{REQUEST_URI} /llm-policy\.json$ [OR]
+  RewriteCond %{REQUEST_URI} /llm-manifest\.json$ [OR]
+  RewriteCond %{REQUEST_URI} /llm-stats\.json$ [OR]
+  RewriteCond %{REQUEST_URI} /llm-changes\.json$ [OR]
+  RewriteCond %{REQUEST_URI} /llms\.txt$
+  RewriteRule .* - [E=Cache-Control:no-cache,E=no-cache:1]
+</IfModule>
+
+<IfModule mod_headers.c>
+  # Ensure If-None-Match header passes through for conditional GET
+  <FilesMatch "\.(json|txt)$">
+    Header set X-TCT-Conditional "enabled"
+  </FilesMatch>
+</IfModule>
+# END Trusted Collaboration Tunnel
+
+HTACCESS;
+    
+    // Add rules at the TOP of .htaccess (before WordPress rules)
+    // This ensures they run before any other rewrite rules
+    file_put_contents($htaccess_file, $rules . $htaccess_content);
+}
+
+// Remove .htaccess rules on deactivation
+register_deactivation_hook(__FILE__, function() {
+    $htaccess_file = ABSPATH . '.htaccess';
+    
+    if (!file_exists($htaccess_file) || !is_writable($htaccess_file)) {
+        return;
+    }
+    
+    $htaccess_content = file_get_contents($htaccess_file);
+    
+    // Remove our rules
+    $htaccess_content = preg_replace(
+        '/# BEGIN Trusted Collaboration Tunnel.*?# END Trusted Collaboration Tunnel
+?/s',
+        '',
+        $htaccess_content
+    );
+    
+    file_put_contents($htaccess_file, $htaccess_content);
 });
