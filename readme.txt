@@ -8,11 +8,11 @@ Stable tag: 1.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Reduce AI crawler bandwidth by 60-90% through efficient machine endpoints with sitemap-first verification and zero-fetch optimization.
+Reduce AI crawler bandwidth by up to 90% through efficient machine endpoints with sitemap-first verification and zero-fetch optimization.
 
 == Description ==
 
-Trusted Collaboration Tunnel (TCT) is a lightweight plugin that enables efficient content delivery to AI crawlers and automated agents. By implementing a standardized protocol with template-invariant fingerprinting and conditional request discipline, TCT reduces bandwidth consumption by 60-90% compared to traditional HTML crawling.
+Trusted Collaboration Tunnel (TCT) is a lightweight plugin that enables efficient content delivery to AI crawlers and automated agents. By implementing a standardized protocol with template-invariant fingerprinting and conditional request discipline, TCT reduces bandwidth consumption by up to 90% compared to traditional HTML crawling.
 
 **Key Features:**
 
@@ -150,7 +150,7 @@ Commercial use at scale (>10,000 URLs/month) may require a separate patent licen
 **Trademark Notice:**
 "Trusted Collaboration Tunnel" and "TCT" are pending trademark applications.
 
-**Note**: The patent-pending technology enables 60-90% bandwidth savings through sitemap-first verification and zero-fetch optimization. This GPL implementation is provided for website owners to benefit from these savings. Large-scale commercial users who build services around this protocol should obtain appropriate licensing.
+**Note**: The patent-pending technology enables up to 90% bandwidth savings through sitemap-first verification and zero-fetch optimization. This GPL implementation is provided for website owners to benefit from these savings. Large-scale commercial users who build services around this protocol should obtain appropriate licensing.
 
 == Privacy & Data ==
 
