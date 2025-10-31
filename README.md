@@ -19,7 +19,7 @@ This plugin implements methods covered by **US Patent Application 63/895,763** (
 **Trademark Notice:**
 "Trusted Collaboration Tunnel" and "TCT" are pending trademark applications.
 
-**Note**: The patent-pending technology enables 60-90% bandwidth savings through sitemap-first verification and zero-fetch optimization. This GPL implementation is provided for website owners to benefit from these savings. Large-scale commercial users who build services around this protocol should obtain appropriate licensing.
+**Note**: The patent-pending technology enables up to 90% bandwidth savings through sitemap-first verification and zero-fetch optimization. This GPL implementation is provided for website owners to benefit from these savings. Large-scale commercial users who build services around this protocol should obtain appropriate licensing.
 
 ## Specification & Resources
 
@@ -40,7 +40,7 @@ Based on 970 URLs across 3 production sites:
 - Endpoint: `{canonical}/llm/` (configurable via `tct_endpoint_slug`)
 - Sitemap: `/llm-sitemap.json`
 - Manifest: `/llms.txt`
-- Headers on M_URL: `Link: <C_URL>; rel="canonical"`, `ETag: "sha256-…"`, `Cache-Control: max-age=0, must-revalidate, stale-while-revalidate=60, stale-if-error=86400`, `Vary: Accept-Encoding`
+- Headers on M_URL: `Link: <C_URL>; rel="canonical"`, `ETag: W/"sha256-…"`, `Cache-Control: max-age=0, must-revalidate, stale-while-revalidate=60, stale-if-error=86400`, `Vary: Accept-Encoding`
 - Conditional GET: honors `If-None-Match` and returns `304` (no body) on match; works for HEAD and GET
 
 ### M-URL JSON Response Format
@@ -48,12 +48,11 @@ Based on 970 URLs across 3 production sites:
 ```json
 {
   "profile": "tct-1",
-  "llm_url": "https://example.com/post/llm/",
   "canonical_url": "https://example.com/post/",
-  "hash": "sha256-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "title": "Post Title",
-  "content": {"text": "Article content..."},
-  "modified": "2025-10-23T18:00:00Z"
+  "content": "Core article content...",
+  "hash": "sha256-2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae",
+  "modified": "2025-10-15T14:30:00Z"
 }
 ```
 
