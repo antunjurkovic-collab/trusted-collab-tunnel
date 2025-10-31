@@ -197,6 +197,7 @@ function tct_output_llm_endpoint($canonical_path) {
         header('Content-Type: application/json; charset=UTF-8', true);
         header('ETag: W/"' . $hash . '"', true);
         header('Cache-Control: max-age=0, must-revalidate, stale-while-revalidate=60, stale-if-error=86400, public', true);
+        header('X-LiteSpeed-Cache-Control: no-cache', false);
         status_header(304);
         // Stats and optional receipt on 304
         if (function_exists('tct_stats_record')) { tct_stats_record($m_url, 304, 0); }
@@ -210,6 +211,7 @@ function tct_output_llm_endpoint($canonical_path) {
     header('ETag: W/"' . $hash . '"', true);
     // Allow CDN/shared cache revalidation while maintaining freshness
     header('Cache-Control: max-age=0, must-revalidate, stale-while-revalidate=60, stale-if-error=86400, public', true);
+    // LiteSpeed Cache: Bypass cache entirely to allow PHP conditional GET logic
     header('X-LiteSpeed-Cache-Control: no-cache', false);
     header('Vary: Accept-Encoding', true);
     tct_emit_policy_links();

@@ -1,0 +1,31 @@
+# LiteSpeed Cache Rules for Trusted Collaboration Tunnel
+# Add these rules to your .htaccess file to ensure 304 responses work
+
+<IfModule LiteSpeed>
+  # Bypass LiteSpeed cache for M-URLs (/{endpoint}/ paths)
+  # This allows WordPress/PHP to handle conditional GET (If-None-Match)
+
+  RewriteEngine On
+
+  # Bypass cache for /llm/ endpoints
+  RewriteCond %{REQUEST_URI} /llm/$ [OR]
+  RewriteCond %{REQUEST_URI} /llm-sitemap\.json$ [OR]
+  RewriteCond %{REQUEST_URI} /llm-policy\.json$ [OR]
+  RewriteCond %{REQUEST_URI} /llm-manifest\.json$ [OR]
+  RewriteCond %{REQUEST_URI} /llm-stats\.json$ [OR]
+  RewriteCond %{REQUEST_URI} /llm-changes\.json$
+  RewriteRule .* - [E=Cache-Control:no-cache,E=no-cache:1]
+
+  # Alternative: Use LiteSpeed environment variable
+  <IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_URI} /llm/
+    RewriteRule .* - [E=noabort:1,E=noconntimeout:1,E=cache-control:no-cache]
+  </IfModule>
+</IfModule>
+
+# Ensure If-None-Match is passed through
+<IfModule mod_headers.c>
+  # Make sure If-None-Match header is not stripped
+  RequestHeader set If-None-Match %{HTTP_IF_NONE_MATCH}e env=HTTP_IF_NONE_MATCH
+</IfModule>
