@@ -37,14 +37,15 @@ require_once TCT_PLUGIN_DIR . 'includes/Stats.php';
 require_once TCT_PLUGIN_DIR . 'includes/Changes.php';
 require_once TCT_PLUGIN_DIR . 'includes/Shortcodes.php';
 
-// CRITICAL: Set no-cache headers VERY early for M-URLs
-// This runs before template_redirect to prevent server-level caching
-add_action('send_headers', 'tct_prevent_server_cache', 1);
 
-function tct_prevent_server_cache() {
-    $uri = $_SERVER['REQUEST_URI'] ?? '';
+// CRITICAL: Prevent WordPress from setting 404 on TCT endpoints
+// Use pre_handle_404 filter (WP 5.5+) to prevent 404 before LiteSpeed Cache sees it
+add_filter('pre_handle_404', 'tct_prevent_404_on_endpoints', 10, 2);
+
+function tct_prevent_404_on_endpoints($preempt, $wp_query) {
     $endpoint = trim(get_option('tct_endpoint_slug', 'llm'));
-    
+    $uri = $_SERVER['REQUEST_URI'] ?? '';
+
     // Check if this is an M-URL or TCT endpoint
     $is_tct_request = (
         strpos($uri, '/' . $endpoint . '/') !== false ||
@@ -55,95 +56,45 @@ function tct_prevent_server_cache() {
         strpos($uri, '/llm-changes.json') !== false ||
         strpos($uri, '/llms.txt') !== false
     );
-    
+
     if ($is_tct_request) {
-        // Set headers to prevent server-level caching
-        // These run before any cache layer can intercept
-        if (!headers_sent()) {
-            header('X-LiteSpeed-Cache-Control: no-cache', false);
-            header('X-Accel-Expires: 0', false); // Nginx cache
-            header('Surrogate-Control: no-store', false); // Varnish/CDN
-            // Don't set Cache-Control here - let Endpoint.php handle it properly
-        }
+        // Return true to prevent WordPress from setting is_404 = true
+        return true;
+    }
+
+    return $preempt;
+}
+
+// Fallback for WP < 5.5: Clear 404 flag on wp hook as backup
+add_action('wp', 'tct_clear_404_fallback', 5);
+
+function tct_clear_404_fallback() {
+    global $wp_query;
+    if (!isset($wp_query)) return;
+    
+    $endpoint = trim(get_option('tct_endpoint_slug', 'llm'));
+    $uri = $_SERVER['REQUEST_URI'] ?? '';
+
+    $is_tct_request = (
+        strpos($uri, '/' . $endpoint . '/') !== false ||
+        strpos($uri, '/llm-sitemap.json') !== false ||
+        strpos($uri, '/llm-policy.json') !== false ||
+        strpos($uri, '/llm-manifest.json') !== false ||
+        strpos($uri, '/llm-stats.json') !== false ||
+        strpos($uri, '/llm-changes.json') !== false ||
+        strpos($uri, '/llms.txt') !== false
+    );
+
+    if ($is_tct_request && $wp_query->is_404) {
+        $wp_query->is_404 = false;
+        status_header(200);
     }
 }
+
+
 
 // Central request router: handle /llm-sitemap.json, /llms.txt, and */llm/
 add_action('template_redirect', 'tct_handle_requests', 0);
-
-// Automatically exclude M-URLs from caching plugins
-// This ensures 304 Not Modified responses work correctly
-add_action('init', 'tct_exclude_from_cache_plugins', 1);
-
-function tct_exclude_from_cache_plugins() {
-    $endpoint = trim(get_option('tct_endpoint_slug', 'llm'));
-    
-    // LiteSpeed Cache plugin integration
-    if (defined('LSCWP_V')) {
-        add_filter('litespeed_cache_is_cacheable', function($cacheable) use ($endpoint) {
-            $uri = $_SERVER['REQUEST_URI'] ?? '';
-            // Exclude M-URLs and TCT JSON endpoints from LiteSpeed cache
-            if (strpos($uri, '/' . $endpoint . '/') !== false ||
-                strpos($uri, '/llm-sitemap.json') !== false ||
-                strpos($uri, '/llm-policy.json') !== false ||
-                strpos($uri, '/llm-manifest.json') !== false ||
-                strpos($uri, '/llm-stats.json') !== false ||
-                strpos($uri, '/llm-changes.json') !== false) {
-                return false; // Don't cache
-            }
-            return $cacheable;
-        }, 10);
-    }
-    
-    // WP Super Cache integration
-    if (function_exists('wp_cache_serve_cache_file')) {
-        add_filter('donotcachepage', function($donotcache) use ($endpoint) {
-            $uri = $_SERVER['REQUEST_URI'] ?? '';
-            if (strpos($uri, '/' . $endpoint . '/') !== false ||
-                strpos($uri, '/llm-sitemap.json') !== false ||
-                strpos($uri, '/llm-policy.json') !== false) {
-                return true; // Don't cache
-            }
-            return $donotcache;
-        }, 10);
-    }
-    
-    // W3 Total Cache integration
-    if (defined('W3TC')) {
-        add_filter('w3tc_can_cache', function($can_cache, $type) use ($endpoint) {
-            $uri = $_SERVER['REQUEST_URI'] ?? '';
-            if (strpos($uri, '/' . $endpoint . '/') !== false ||
-                strpos($uri, '/llm-sitemap.json') !== false ||
-                strpos($uri, '/llm-policy.json') !== false) {
-                return false; // Don't cache
-            }
-            return $can_cache;
-        }, 10, 2);
-    }
-    
-    // WP Rocket integration
-    if (defined('WP_ROCKET_VERSION')) {
-        add_filter('rocket_cache_reject_uri', function($uris) use ($endpoint) {
-            $uris[] = '/' . $endpoint . '/';
-            $uris[] = '/llm-sitemap.json';
-            $uris[] = '/llm-policy.json';
-            return $uris;
-        }, 10);
-    }
-    
-    // WP Fastest Cache integration
-    if (class_exists('WpFastestCache')) {
-        add_filter('wpfc_exclude_current_page', function($exclude) use ($endpoint) {
-            $uri = $_SERVER['REQUEST_URI'] ?? '';
-            if (strpos($uri, '/' . $endpoint . '/') !== false ||
-                strpos($uri, '/llm-sitemap.json') !== false ||
-                strpos($uri, '/llm-policy.json') !== false) {
-                return true; // Don't cache
-            }
-            return $exclude;
-        }, 10);
-    }
-}
 
 // Add HTML rel="alternate" link for pages/front page (optional but recommended)
 add_action('wp_head', 'tct_output_html_alternate_link', 5);
@@ -153,9 +104,6 @@ register_activation_hook(__FILE__, function() {
     add_option('tct_endpoint_slug', 'llm');
     add_option('tct_sitemap_path', '/llm-sitemap.json');
     // Default manifest path moved to JSON to avoid colliding with llms.txt
-    
-    // CRITICAL: Add .htaccess rules to prevent LiteSpeed caching M-URLs
-    tct_add_htaccess_rules();
     add_option('tct_manifest_path', '/llm-manifest.json');
     // New: public path for human-readable llms.txt
     add_option('tct_llms_path', '/llms.txt');
@@ -218,79 +166,4 @@ add_filter('query_vars', function($vars) {
     if (is_array($vars)) { $vars[] = 'tct_stats'; }
     if (is_array($vars)) { $vars[] = 'tct_changes'; }
     return $vars;
-});
-
-// Add .htaccess rules to prevent server-level caching of M-URLs
-function tct_add_htaccess_rules() {
-    $htaccess_file = ABSPATH . '.htaccess';
-    
-    // Check if .htaccess exists and is writable
-    if (!file_exists($htaccess_file)) {
-        return; // Can't add rules if file doesn't exist
-    }
-    
-    if (!is_writable($htaccess_file)) {
-        return; // Can't modify if not writable
-    }
-    
-    $htaccess_content = file_get_contents($htaccess_file);
-    
-    // Check if our rules are already present
-    if (strpos($htaccess_content, '# BEGIN Trusted Collaboration Tunnel') !== false) {
-        return; // Rules already added
-    }
-    
-    $endpoint = trim(get_option('tct_endpoint_slug', 'llm'));
-    
-    $rules = <<<HTACCESS
-
-# BEGIN Trusted Collaboration Tunnel
-# These rules prevent server-level caching of M-URLs to enable 304 Not Modified responses
-<IfModule LiteSpeed>
-  # Bypass LiteSpeed cache for TCT endpoints
-  RewriteEngine On
-  RewriteCond %{REQUEST_URI} /{$endpoint}/$ [OR]
-  RewriteCond %{REQUEST_URI} /llm-sitemap\.json$ [OR]
-  RewriteCond %{REQUEST_URI} /llm-policy\.json$ [OR]
-  RewriteCond %{REQUEST_URI} /llm-manifest\.json$ [OR]
-  RewriteCond %{REQUEST_URI} /llm-stats\.json$ [OR]
-  RewriteCond %{REQUEST_URI} /llm-changes\.json$ [OR]
-  RewriteCond %{REQUEST_URI} /llms\.txt$
-  RewriteRule .* - [E=Cache-Control:no-cache,E=no-cache:1]
-</IfModule>
-
-<IfModule mod_headers.c>
-  # Ensure If-None-Match header passes through for conditional GET
-  <FilesMatch "\.(json|txt)$">
-    Header set X-TCT-Conditional "enabled"
-  </FilesMatch>
-</IfModule>
-# END Trusted Collaboration Tunnel
-
-HTACCESS;
-    
-    // Add rules at the TOP of .htaccess (before WordPress rules)
-    // This ensures they run before any other rewrite rules
-    file_put_contents($htaccess_file, $rules . $htaccess_content);
-}
-
-// Remove .htaccess rules on deactivation
-register_deactivation_hook(__FILE__, function() {
-    $htaccess_file = ABSPATH . '.htaccess';
-    
-    if (!file_exists($htaccess_file) || !is_writable($htaccess_file)) {
-        return;
-    }
-    
-    $htaccess_content = file_get_contents($htaccess_file);
-    
-    // Remove our rules
-    $htaccess_content = preg_replace(
-        '/# BEGIN Trusted Collaboration Tunnel.*?# END Trusted Collaboration Tunnel
-?/s',
-        '',
-        $htaccess_content
-    );
-    
-    file_put_contents($htaccess_file, $htaccess_content);
 });

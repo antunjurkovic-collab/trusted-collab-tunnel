@@ -180,8 +180,12 @@ function tct_output_llm_endpoint($canonical_path) {
         exit;
     }
 
-    // CRITICAL: Check conditional GET BEFORE setting caching headers
-    // This prevents caching layers from interfering with 304 logic
+    // CRITICAL: Clear 404 flag early
+    if (isset($GLOBALS['wp_query'])) {
+        $GLOBALS['wp_query']->is_404 = false;
+    }
+
+    // Conditional GET check FIRST - before sending ANY headers or setting status
     $inm = isset($_SERVER['HTTP_IF_NONE_MATCH']) ? trim((string)$_SERVER['HTTP_IF_NONE_MATCH']) : '';
     $match_inm = false;
     if ($inm) {
@@ -193,26 +197,24 @@ function tct_output_llm_endpoint($canonical_path) {
         }
     }
     if ($match_inm) {
-        // Emit minimal headers for 304 response
-        header('Content-Type: application/json; charset=UTF-8', true);
-        header('ETag: W/"' . $hash . '"', true);
-        header('Cache-Control: max-age=0, must-revalidate, stale-while-revalidate=60, stale-if-error=86400, public', true);
-        header('X-LiteSpeed-Cache-Control: no-cache', false);
         status_header(304);
+        header('ETag: "' . $hash . '"', true);
+        header('Cache-Control: max-age=0, must-revalidate, stale-while-revalidate=60, stale-if-error=86400', true);
         // Stats and optional receipt on 304
         if (function_exists('tct_stats_record')) { tct_stats_record($m_url, 304, 0); }
         if (tct_receipts_enabled()) { tct_emit_usage_receipt($hash, 304, 0); }
         exit;
     }
 
+    // No match - send 200 response with full headers
+    status_header(200);
+
     // Common headers for both HEAD and GET
     header('Content-Type: application/json; charset=UTF-8', true);
     header('Link: <' . esc_url_raw($c_url) . '>; rel="canonical"', false);
-    header('ETag: W/"' . $hash . '"', true);
+    header('ETag: "' . $hash . '"', true);
     // Allow CDN/shared cache revalidation while maintaining freshness
-    header('Cache-Control: max-age=0, must-revalidate, stale-while-revalidate=60, stale-if-error=86400, public', true);
-    // LiteSpeed Cache: Bypass cache entirely to allow PHP conditional GET logic
-    header('X-LiteSpeed-Cache-Control: no-cache', false);
+    header('Cache-Control: max-age=0, must-revalidate, stale-while-revalidate=60, stale-if-error=86400', true);
     header('Vary: Accept-Encoding', true);
     tct_emit_policy_links();
 
@@ -221,16 +223,10 @@ function tct_output_llm_endpoint($canonical_path) {
     header('Link: <' . esc_url_raw($policy_url) . '>; rel="describedby"; type="application/json"', false);
 
     if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'HEAD') {
-        status_header(200);
         if (function_exists('tct_stats_record')) { tct_stats_record($m_url, 200, 0); }
         exit;
     }
 
-    // Ensure 200 OK for JSON body even if WP query considered this path a 404
-    if (isset($GLOBALS['wp_query'])) {
-        $GLOBALS['wp_query']->is_404 = false;
-    }
-    status_header(200);
 
     $body = wp_json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     $blen = strlen($body);

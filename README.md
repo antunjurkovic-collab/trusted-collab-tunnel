@@ -40,8 +40,10 @@ Based on 970 URLs across 3 production sites:
 - Endpoint: `{canonical}/llm/` (configurable via `tct_endpoint_slug`)
 - Sitemap: `/llm-sitemap.json`
 - Manifest: `/llms.txt`
-- Headers on M_URL: `Link: <C_URL>; rel="canonical"`, `ETag: W/"sha256-…"`, `Cache-Control: max-age=0, must-revalidate, stale-while-revalidate=60, stale-if-error=86400`, `Vary: Accept-Encoding`
+- Headers on M_URL: `Link: <C_URL>; rel="canonical"`, `ETag: "sha256-…"`, `Cache-Control: max-age=0, must-revalidate, stale-while-revalidate=60, stale-if-error=86400`, `Vary: Accept-Encoding`
 - Conditional GET: honors `If-None-Match` and returns `304` (no body) on match; works for HEAD and GET
+
+**Note on ETags:** TCT uses strong ETags based on content hash (template-invariant), not JSON byte hash. This means the same article content produces the same ETag regardless of HTML presentation or theme changes. See specification for detailed computation semantics.
 
 ### M-URL JSON Response Format
 

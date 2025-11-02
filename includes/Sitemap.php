@@ -22,7 +22,7 @@ function tct_output_sitemap() {
         'post_type' => $post_types,
         'post_status' => 'publish',
         'post__not_in' => $post_not_in,
-        'posts_per_page' => 200,
+        'posts_per_page' => -1,  // Include ALL posts
         'orderby' => 'modified',
         'order' => 'DESC',
         'fields' => 'ids',
@@ -30,7 +30,7 @@ function tct_output_sitemap() {
     $qargs = apply_filters('tct_sitemap_query_args', $qargs);
     $ids = get_posts($qargs);
 
-    $items = [];
+    $entries = [];
 
     // Add homepage as first item
     $home_url = trailingslashit(home_url('/'));
@@ -47,11 +47,11 @@ function tct_output_sitemap() {
             $hash = tct_compute_fingerprint($normalized);
             $modified = get_post_modified_time('c', true, $home_post);
 
-            $items[] = [
-                'cUrl' => $home_url,
-                'mUrl' => $home_m_url,
+            $entries[] = [
+                'canonical_url' => $home_url,
+                'llm_url' => $home_m_url,
                 'modified' => $modified,
-                'contentHash' => $hash,
+                'hash' => $hash,
             ];
         }
     } else {
@@ -64,11 +64,11 @@ function tct_output_sitemap() {
             $hash = tct_compute_fingerprint($normalized);
             $modified = gmdate('c', strtotime($pseudo->post_modified_gmt));
 
-            $items[] = [
-                'cUrl' => $home_url,
-                'mUrl' => $home_m_url,
+            $entries[] = [
+                'canonical_url' => $home_url,
+                'llm_url' => $home_m_url,
                 'modified' => $modified,
-                'contentHash' => $hash,
+                'hash' => $hash,
             ];
         }
     }
@@ -91,17 +91,17 @@ function tct_output_sitemap() {
             $normalized = tct_normalize_text($content_string);
             $hash = tct_compute_fingerprint($normalized);
         }
-        $items[] = [
-            'cUrl' => trailingslashit($c_url),
-            'mUrl' => trailingslashit($m_url),
+        $entries[] = [
+            'canonical_url' => trailingslashit($c_url),
+            'llm_url' => trailingslashit($m_url),
             'modified' => get_post_modified_time('c', true, $post),
-            'contentHash' => $hash,
+            'hash' => $hash,
         ];
     }
     $out = [
         'version' => 1,
         'profile' => 'tct-1',
-        'items' => $items,
+        'entries' => $entries,
     ];
     echo wp_json_encode($out, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 }
