@@ -144,7 +144,11 @@ function tct_output_llm_endpoint($canonical_path) {
         $hash = $filtered['hash'];
     }
 
-    // Build authoritative content string (plain text) and compute hash
+    // TCT Hash Computation Method B: Content-Locked Strong-Content
+    // Per draft-jurkovikj-collab-tunnel-00 Section "Strong ETag and Parity (Normative)"
+    // This implementation uses Method B where the hash is computed from normalized
+    // content text. This is valid because all JSON fields are deterministic functions
+    // of the content (no independent metadata fields).
     $content_string = tct_build_content_string($post);
     $normalized = tct_normalize_text($content_string);
     $computed_hash = tct_compute_fingerprint($normalized);
@@ -228,6 +232,9 @@ function tct_output_llm_endpoint($canonical_path) {
     }
 
 
+    // Deterministic JSON serialization per TCT spec
+    // JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ensures consistent encoding
+    // Note: PHP json_encode preserves key insertion order (deterministic for our payload)
     $body = wp_json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     $blen = strlen($body);
     if (function_exists('tct_stats_record')) { tct_stats_record($m_url, 200, $blen); }

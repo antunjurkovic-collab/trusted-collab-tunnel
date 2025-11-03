@@ -43,7 +43,7 @@ Based on 970 URLs across 3 production sites:
 - Headers on M_URL: `Link: <C_URL>; rel="canonical"`, `ETag: "sha256-…"`, `Cache-Control: max-age=0, must-revalidate, stale-while-revalidate=60, stale-if-error=86400`, `Vary: Accept-Encoding`
 - Conditional GET: honors `If-None-Match` and returns `304` (no body) on match; works for HEAD and GET
 
-**Note on ETags:** TCT uses strong ETags based on content hash (template-invariant), not JSON byte hash. This means the same article content produces the same ETag regardless of HTML presentation or theme changes. See specification for detailed computation semantics.
+**Note on ETags and Hash Computation:** This implementation uses TCT Method B (Content-Locked Strong-Content) where the hash is computed from normalized content text, not JSON bytes. This produces template-invariant hashes: the same article content generates the same ETag regardless of HTML presentation or theme changes. All JSON fields are deterministic functions of content, ensuring RFC 9110 compliance for strong ETags. See draft-jurkovikj-collab-tunnel-00 Section "Strong ETag and Parity (Normative)" for detailed semantics.
 
 ### M-URL JSON Response Format
 
