@@ -67,8 +67,41 @@ function tct_normalize_text($text) {
 
 /**
  * Compute sha256-<hex> fingerprint from normalized text.
+ * @deprecated Use tct_compute_hash_from_json() for draft-01 compliance
  */
 function tct_compute_fingerprint($normalized_text) {
     $hex = hash('sha256', (string)$normalized_text);
+    return 'sha256-' . $hex;
+}
+
+/**
+ * Compute SHA-256 hash from canonical JSON (Method A per draft-01).
+ *
+ * Per draft-jurkovikj-collab-tunnel-01 Section 6.2:
+ * 1. Build payload object WITHOUT hash field
+ * 2. Canonicalize to UTF-8 bytes (deterministic JSON)
+ * 3. Compute SHA-256
+ * 4. Return as "sha256-<64hex>"
+ *
+ * @param array $payload Associative array (WITHOUT 'hash' field)
+ * @return string Hash in format "sha256-<hex>"
+ */
+function tct_compute_hash_from_json($payload) {
+    // Remove hash field if accidentally included
+    $clean = $payload;
+    unset($clean['hash']);
+
+    // Canonical JSON: JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ensures deterministic output
+    // PHP json_encode preserves key insertion order (deterministic for our payloads)
+    // For full RFC 8785 compliance, would need a dedicated library, but this is sufficient
+    // for TCT's deterministic requirements (stable keys, no prettifying, UTF-8)
+    $canonical = wp_json_encode($clean, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+    if ($canonical === false) {
+        // Fallback: try without Unicode unescaping
+        $canonical = wp_json_encode($clean, JSON_UNESCAPED_SLASHES);
+    }
+
+    $hex = hash('sha256', $canonical);
     return 'sha256-' . $hex;
 }

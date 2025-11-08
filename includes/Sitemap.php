@@ -42,33 +42,32 @@ function tct_output_sitemap() {
         // Static homepage - use actual page content
         $home_post = get_post($front_id);
         if ($home_post) {
-            $content_string = tct_build_content_string($home_post);
-            $normalized = tct_normalize_text($content_string);
-            $hash = tct_compute_fingerprint($normalized);
+            // Build payload and compute hash from canonical JSON (Method A)
+            $home_payload = tct_build_full_payload($home_post, $home_url, $home_m_url, null);
+            $etag = tct_compute_hash_from_json($home_payload);
             $modified = get_post_modified_time('c', true, $home_post);
 
             $entries[] = [
-                'canonical_url' => $home_url,
-                'llm_url' => $home_m_url,
+                'cUrl' => $home_url,
+                'mUrl' => $home_m_url,
                 'modified' => $modified,
-                'hash' => $hash,
+                'etag' => $etag,
             ];
         }
     } else {
         // Blog list homepage - use synthetic content
         if (function_exists('tct_create_homepage_pseudo_post')) {
             $pseudo = tct_create_homepage_pseudo_post();
-            // Build authoritative content string for parity with endpoint
-            $content_string = tct_build_content_string($pseudo);
-            $normalized = tct_normalize_text($content_string);
-            $hash = tct_compute_fingerprint($normalized);
+            // Build payload and compute hash from canonical JSON
+            $pseudo_payload = tct_build_full_payload($pseudo, $home_url, $home_m_url, null);
+            $etag = tct_compute_hash_from_json($pseudo_payload);
             $modified = gmdate('c', strtotime($pseudo->post_modified_gmt));
 
             $entries[] = [
-                'canonical_url' => $home_url,
-                'llm_url' => $home_m_url,
+                'cUrl' => $home_url,
+                'mUrl' => $home_m_url,
                 'modified' => $modified,
-                'hash' => $hash,
+                'etag' => $etag,
             ];
         }
     }
@@ -79,29 +78,30 @@ function tct_output_sitemap() {
         if (!$c_url) { continue; }
         $m_url = trailingslashit($c_url) . trailingslashit($endpoint);
 
-        // Hash: ask payload filter for hash first, else compute
-        $hash = null;
+        // Build payload and compute hash from canonical JSON (Method A)
         $post = get_post($pid);
+        $post_payload = tct_build_full_payload($post, trailingslashit($c_url), trailingslashit($m_url), null);
+
+        // Allow filters to override payload, but always recompute hash from final payload
         $filtered = apply_filters('tct_build_payload', null, $post, $c_url, $m_url);
-        if (is_array($filtered) && isset($filtered['hash'])) {
-            $hash = $filtered['hash'];
+        if (is_array($filtered)) {
+            $post_payload = $filtered;
         }
-        if (!$hash) {
-            $content_string = tct_build_content_string($post);
-            $normalized = tct_normalize_text($content_string);
-            $hash = tct_compute_fingerprint($normalized);
-        }
+
+        // Compute etag from canonical JSON (always, to ensure parity)
+        $etag = tct_compute_hash_from_json($post_payload);
+
         $entries[] = [
-            'canonical_url' => trailingslashit($c_url),
-            'llm_url' => trailingslashit($m_url),
+            'cUrl' => trailingslashit($c_url),
+            'mUrl' => trailingslashit($m_url),
             'modified' => get_post_modified_time('c', true, $post),
-            'hash' => $hash,
+            'etag' => $etag,
         ];
     }
     $out = [
         'version' => 1,
         'profile' => 'tct-1',
-        'entries' => $entries,
+        'items' => $entries,
     ];
     echo wp_json_encode($out, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 }

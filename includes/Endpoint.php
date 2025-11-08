@@ -144,19 +144,18 @@ function tct_output_llm_endpoint($canonical_path) {
         $hash = $filtered['hash'];
     }
 
-    // TCT Hash Computation Method B: Content-Locked Strong-Content
-    // Per draft-jurkovikj-collab-tunnel-00 Section "Strong ETag and Parity (Normative)"
-    // This implementation uses Method B where the hash is computed from normalized
-    // content text. This is valid because all JSON fields are deterministic functions
-    // of the content (no independent metadata fields).
-    $content_string = tct_build_content_string($post);
-    $normalized = tct_normalize_text($content_string);
-    $computed_hash = tct_compute_fingerprint($normalized);
-    // Use computed hash to ensure sitemap and endpoint always match
-    $hash = $computed_hash;
+    // TCT Hash Computation Method A: Canonical JSON Strong-Byte
+    // Per draft-jurkovikj-collab-tunnel-01 Section 6.2 (ONLY method allowed in -01)
+    // Build payload WITHOUT hash, compute SHA-256 from canonical JSON, then add hash
 
-    // Always build full-content details from the current post
-    $full = tct_build_full_payload($post, $c_url, $m_url, $hash);
+    // Always build full-content details from the current post (without hash)
+    $full = tct_build_full_payload($post, $c_url, $m_url, null);
+
+    // Compute hash from canonical JSON of the payload (excluding hash field)
+    $hash = tct_compute_hash_from_json($full);
+
+    // Now add hash to the payload
+    $full['hash'] = $hash;
 
     // If another component supplied a payload, merge in content if missing or empty
     if (is_array($payload)) {
@@ -171,9 +170,11 @@ function tct_output_llm_endpoint($canonical_path) {
         // Ensure required top-level fields exist
         $payload['llm_url'] = $payload['llm_url'] ?? $m_url;
         $payload['canonical_url'] = $payload['canonical_url'] ?? $c_url;
+        // Recompute hash from merged payload
+        $hash = tct_compute_hash_from_json($payload);
         $payload['hash'] = $hash;
     } else {
-        // No external payload → use our full payload (not the minimal)
+        // No external payload → use our full payload
         $payload = $full;
     }
 
@@ -391,7 +392,6 @@ function tct_build_full_payload($post, $c_url, $m_url, $hash) {
         'title' => $title,
         'modified' => $modified,
         'published' => $published,
-        'hash' => $hash,
         'word_count' => $wc,
         'slug' => $slug,
         'excerpt' => $excerpt,
@@ -403,6 +403,11 @@ function tct_build_full_payload($post, $c_url, $m_url, $hash) {
         'tags' => $tagsArr,
         'content' => $content_text,
     ];
+
+    // Add hash only if provided (used after hash computation)
+    if ($hash !== null) {
+        $payload['hash'] = $hash;
+    }
     // Allow site owners to force full content regardless of third-party filters
     $force = (int) get_option('tct_force_full_content', 1) === 1;
     if (!$force) {

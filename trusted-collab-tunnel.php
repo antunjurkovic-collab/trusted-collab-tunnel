@@ -99,6 +99,26 @@ add_action('template_redirect', 'tct_handle_requests', 0);
 // Add HTML rel="alternate" link for pages/front page (optional but recommended)
 add_action('wp_head', 'tct_output_html_alternate_link', 5);
 
+// Add Link header on root for M-Sitemap discovery (draft-01 Section 4.1 REQUIRED)
+add_action('send_headers', 'tct_add_root_link_header');
+
+function tct_add_root_link_header() {
+    // Only add Link header on homepage (root)
+    if (!is_front_page() && !is_home()) {
+        return;
+    }
+
+    // Get sitemap path from settings
+    $sitemap_path = get_option('tct_sitemap_path', '/llm-sitemap.json');
+
+    // Send Link header per draft-jurkovikj-collab-tunnel-01 Section 4.1
+    // MUST include: rel="index" and type="application/json"
+    header(
+        'Link: <' . esc_url_raw(home_url($sitemap_path)) . '>; rel="index"; type="application/json"',
+        false
+    );
+}
+
 // Optional: activation defaults
 register_activation_hook(__FILE__, function() {
     add_option('tct_endpoint_slug', 'llm');
