@@ -33,9 +33,39 @@ require_once TCT_PLUGIN_DIR . 'includes/Manifest.php';
 require_once TCT_PLUGIN_DIR . 'includes/HeadLinks.php';
 require_once TCT_PLUGIN_DIR . 'includes/LLMS.php';
 require_once TCT_PLUGIN_DIR . 'includes/Admin.php';
+require_once TCT_PLUGIN_DIR . 'includes/AdminCache.php';
 require_once TCT_PLUGIN_DIR . 'includes/Stats.php';
 require_once TCT_PLUGIN_DIR . 'includes/Changes.php';
 require_once TCT_PLUGIN_DIR . 'includes/Shortcodes.php';
+
+// Cache invalidation for sitemap (Phase 0: Expert-approved pattern)
+// Invalidates cache when content changes to ensure fresh sitemaps
+add_action('save_post', 'tct_invalidate_sitemap_cache');
+add_action('delete_post', 'tct_invalidate_sitemap_cache');
+add_action('trash_post', 'tct_invalidate_sitemap_cache');
+add_action('untrash_post', 'tct_invalidate_sitemap_cache');
+
+/**
+ * Invalidate sitemap cache when content changes.
+ *
+ * This ensures the sitemap reflects current site content without
+ * requiring full regeneration on every request.
+ *
+ * @param int|null $post_id The post ID being modified
+ */
+function tct_invalidate_sitemap_cache($post_id = null) {
+    // Ignore revisions and autosaves
+    if ($post_id && (wp_is_post_revision($post_id) || wp_is_post_autosave($post_id))) {
+        return;
+    }
+
+    // Clear both old and new cache versions (for smooth upgrade)
+    delete_transient('tct_sitemap_cache_v2');
+    delete_transient('tct_sitemap_cache_v3');
+
+    // Also invalidate recent changes cache if implemented
+    delete_transient('tct_sitemap_recent_cache_v2');
+}
 
 
 // CRITICAL: Prevent WordPress from setting 404 on TCT endpoints

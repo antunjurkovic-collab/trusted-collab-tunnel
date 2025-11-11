@@ -135,48 +135,11 @@ function tct_output_llm_endpoint($canonical_path) {
         }
     }
 
-    // Allow another plugin (e.g., llm-pages) to provide payload and hash
-    $payload = null;
-    $hash = null;
-    $filtered = apply_filters('tct_build_payload', null, $post, $c_url, $m_url);
-    if (is_array($filtered) && isset($filtered['payload'], $filtered['hash'])) {
-        $payload = $filtered['payload'];
-        $hash = $filtered['hash'];
-    }
-
-    // TCT Hash Computation Method A: Canonical JSON Strong-Byte
-    // Per draft-jurkovikj-collab-tunnel-01 Section 6.2 (ONLY method allowed in -01)
-    // Build payload WITHOUT hash, compute SHA-256 from canonical JSON, then add hash
-
-    // Always build full-content details from the current post (without hash)
-    $full = tct_build_full_payload($post, $c_url, $m_url, null);
-
-    // Compute hash from canonical JSON of the payload (excluding hash field)
-    $hash = tct_compute_hash_from_json($full);
-
-    // Now add hash to the payload
-    $full['hash'] = $hash;
-
-    // If another component supplied a payload, merge in content if missing or empty
-    if (is_array($payload)) {
-        if (!isset($payload['content']) || $payload['content'] === '' || $payload['content'] === null) {
-            $payload['content'] = $full['content'];
-        }
-        if (!isset($payload['excerpt']) || empty($payload['excerpt'])) {
-            $payload['excerpt'] = $full['excerpt'];
-        }
-        // Always provide a word_count derived from our text to ensure parity
-        $payload['word_count'] = $full['word_count'];
-        // Ensure required top-level fields exist
-        $payload['llm_url'] = $payload['llm_url'] ?? $m_url;
-        $payload['canonical_url'] = $payload['canonical_url'] ?? $c_url;
-        // Recompute hash from merged payload
-        $hash = tct_compute_hash_from_json($payload);
-        $payload['hash'] = $hash;
-    } else {
-        // No external payload → use our full payload
-        $payload = $full;
-    }
+    // Use unified helper: ensures M-URL ETag == sitemap etag (expert review fix)
+    // This is the SINGLE SOURCE OF TRUTH for payload and hash computation
+    // Per expert: "Both sitemap and M-URL must derive from the same
+    // canonicalization/hashing pipeline."
+    list($payload, $hash) = tct_build_tct_payload_and_hash($post, $c_url, $m_url);
 
     // Optional auth
     if (tct_auth_required() && !tct_auth_ok()) {
@@ -425,30 +388,36 @@ function tct_create_homepage_pseudo_post() {
     $site_desc = get_bloginfo('description');
     $sitemap_url = home_url('/llm-sitemap.json');
 
-    // Get recent posts for featured section
-    $recent = get_posts([
-        'posts_per_page' => 5,
-        'post_status' => 'publish',
-        'orderby' => 'date',
-        'order' => 'DESC',
-    ]);
-
-    // Build synthetic homepage content
+    // Build STATIC homepage content
+    // REMOVED: Dynamic recent posts (get_posts() loop) to ensure stable hash
+    // Per expert review: Homepage M-URL must have stable content for ETag parity
+    // Dynamic "latest 5 posts" caused cache drift (sitemap cached at T1, M-URL at T2)
     $content = "{$site_name}\n\n";
     if ($site_desc) {
         $content .= "{$site_desc}\n\n";
     }
 
-    if (!empty($recent)) {
-        $content .= "Recent Content:\n";
-        foreach ($recent as $p) {
-            $title = get_the_title($p);
-            $content .= "- {$title}\n";
-        }
-        $content .= "\n";
-    }
-
     $content .= "For complete content, visit the LLM sitemap: {$sitemap_url}";
+
+    // Get most recent post's modified date for stable timestamps
+    // This ensures homepage hash is stable until actual content changes
+    $recent_post = get_posts([
+        'posts_per_page' => 1,
+        'post_status' => 'publish',
+        'orderby' => 'modified',
+        'order' => 'DESC',
+        'fields' => 'ids',
+    ]);
+
+    if (!empty($recent_post)) {
+        $latest_id = $recent_post[0];
+        $modified_date = get_post_modified_time('Y-m-d H:i:s', false, $latest_id);
+        $modified_date_gmt = get_post_modified_time('Y-m-d H:i:s', true, $latest_id);
+    } else {
+        // Fallback: Use a fixed epoch date if no posts exist
+        $modified_date = '2025-01-01 00:00:00';
+        $modified_date_gmt = '2025-01-01 00:00:00';
+    }
 
     // Create pseudo-post object that behaves like a real post
     $pseudo = new stdClass();
@@ -459,10 +428,11 @@ function tct_create_homepage_pseudo_post() {
     $pseudo->post_type = 'homepage';
     $pseudo->post_status = 'publish';
     $pseudo->post_author = 0;
-    $pseudo->post_date = current_time('mysql');
-    $pseudo->post_date_gmt = current_time('mysql', 1);
-    $pseudo->post_modified = current_time('mysql');
-    $pseudo->post_modified_gmt = current_time('mysql', 1);
+    // Use stable timestamps from most recent actual post (not current_time!)
+    $pseudo->post_date = $modified_date;
+    $pseudo->post_date_gmt = $modified_date_gmt;
+    $pseudo->post_modified = $modified_date;
+    $pseudo->post_modified_gmt = $modified_date_gmt;
     $pseudo->post_name = 'homepage';
 
     return $pseudo;

@@ -4,6 +4,21 @@ if (!defined('ABSPATH')) { exit; }
 function tct_output_sitemap() {
     header('Content-Type: application/json; charset=UTF-8', true);
 
+    // Cache-Control: Allow CDN caching but with revalidation
+    // Matches internal cache duration (default: 3600s = 1 hour)
+    $cache_duration = (int) get_option('tct_sitemap_cache_duration', 3600);
+    header('Cache-Control: max-age=' . $cache_duration . ', must-revalidate, stale-while-revalidate=60', true);
+
+    // Phase 0: Check cache first (expert-approved pattern)
+    // v3: Updated to use unified tct_build_tct_payload_and_hash helper (ensures parity)
+    $cache_key = 'tct_sitemap_cache_v3';
+    $cached = get_transient($cache_key);
+
+    if ($cached !== false) {
+        echo $cached;
+        return;
+    }
+
     $endpoint = trim(get_option('tct_endpoint_slug', 'llm'));
     // Collect recent posts/pages (publish). Sites can filter this query.
     // Default behavior: exclude WooCommerce 'product' CPT and the Shop page.
@@ -42,9 +57,8 @@ function tct_output_sitemap() {
         // Static homepage - use actual page content
         $home_post = get_post($front_id);
         if ($home_post) {
-            // Build payload and compute hash from canonical JSON (Method A)
-            $home_payload = tct_build_full_payload($home_post, $home_url, $home_m_url, null);
-            $etag = tct_compute_hash_from_json($home_payload);
+            // Use unified helper: ensures sitemap etag == M-URL ETag (expert review fix)
+            list(, $etag) = tct_build_tct_payload_and_hash($home_post, $home_url, $home_m_url);
             $modified = get_post_modified_time('c', true, $home_post);
 
             $entries[] = [
@@ -58,9 +72,8 @@ function tct_output_sitemap() {
         // Blog list homepage - use synthetic content
         if (function_exists('tct_create_homepage_pseudo_post')) {
             $pseudo = tct_create_homepage_pseudo_post();
-            // Build payload and compute hash from canonical JSON
-            $pseudo_payload = tct_build_full_payload($pseudo, $home_url, $home_m_url, null);
-            $etag = tct_compute_hash_from_json($pseudo_payload);
+            // Use unified helper: ensures sitemap etag == M-URL ETag (expert review fix)
+            list(, $etag) = tct_build_tct_payload_and_hash($pseudo, $home_url, $home_m_url);
             $modified = gmdate('c', strtotime($pseudo->post_modified_gmt));
 
             $entries[] = [
@@ -78,18 +91,14 @@ function tct_output_sitemap() {
         if (!$c_url) { continue; }
         $m_url = trailingslashit($c_url) . trailingslashit($endpoint);
 
-        // Build payload and compute hash from canonical JSON (Method A)
+        // Use unified helper: ensures sitemap etag == M-URL ETag (expert review fix)
+        // This applies the same canonicalization/hashing pipeline as the M-URL endpoint
         $post = get_post($pid);
-        $post_payload = tct_build_full_payload($post, trailingslashit($c_url), trailingslashit($m_url), null);
-
-        // Allow filters to override payload, but always recompute hash from final payload
-        $filtered = apply_filters('tct_build_payload', null, $post, $c_url, $m_url);
-        if (is_array($filtered)) {
-            $post_payload = $filtered;
-        }
-
-        // Compute etag from canonical JSON (always, to ensure parity)
-        $etag = tct_compute_hash_from_json($post_payload);
+        list(, $etag) = tct_build_tct_payload_and_hash(
+            $post,
+            trailingslashit($c_url),
+            trailingslashit($m_url)
+        );
 
         $entries[] = [
             'cUrl' => trailingslashit($c_url),
@@ -103,6 +112,19 @@ function tct_output_sitemap() {
         'profile' => 'tct-1',
         'items' => $entries,
     ];
-    echo wp_json_encode($out, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+    // Generate JSON with error handling
+    $json = wp_json_encode($out, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+    if ($json === false) {
+        status_header(500);
+        return;
+    }
+
+    // Cache for configurable duration (default: 1 hour)
+    $cache_duration = (int) get_option('tct_sitemap_cache_duration', 3600);
+    set_transient($cache_key, $json, $cache_duration);
+
+    echo $json;
 }
 
