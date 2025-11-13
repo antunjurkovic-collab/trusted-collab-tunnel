@@ -46,20 +46,17 @@ The **patent application** covers the underlying **methods and systems** (not th
 - **Open source contributors** improving this GPL code
 - **Researchers** studying the implementation
 
-### ⚠️ Patent License MAY Be Required:
+## Licensing Status
 
-- **Commercial AI companies** operating large-scale crawlers using TCT protocol
-- **CDN providers** offering TCT as a commercial service
-- **SaaS platforms** providing TCT endpoints at scale (>10,000 URLs/month)
-- **Technology vendors** incorporating TCT into commercial products
+**Royalty-Free (RF) License:**
 
-## Licensing Intent
+Under the IETF Intellectual Property Rights policy (RFC 8179), this technology is available to **all implementers** under a perpetual, irrevocable, **Royalty-Free license**.
 
-The author is considering **Royalty-Free (RF) licensing terms** for implementations that follow IETF standardization processes (if TCT becomes an IETF standard).
+- ✅ **No commercial licensing fees**
+- ✅ **No restrictions based on scale** (>10K URLs/month or otherwise)
+- ✅ **Available to everyone:** website owners, AI companies, CDN providers, SaaS platforms, technology vendors
 
-For commercial licensing inquiries, contact:
-- Email: antunjurkovic@gmail.com
-- Subject: "TCT Commercial Patent License Inquiry"
+**Official IETF IPR Disclosure:** https://datatracker.ietf.org/ipr/7074/
 
 ## IETF and Standards Process
 

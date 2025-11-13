@@ -2,24 +2,39 @@
 
 A minimal, install-and-go plugin that exposes a deterministic machine endpoint (M_URL) for each canonical page (C_URL), with validator discipline and sitemap-first skip. Optional trust extensions add policy links, access control, and usage receipts.
 
-## Patent Notice
+## Licensing & Patent Notice
 
-This plugin implements methods covered by **US Patent Application 63/895,763** ("Method and System for a Collaborative, Resource-Efficient, and Verifiable Communication Tunnel", filed October 8, 2025, status: Patent Pending).
+### An Open, Royalty-Free Standard
 
-**For Website Owners:**
-- ✅ FREE to install and use under GPL v2+ license
-- ✅ No additional patent license required for your own website
-- ✅ Full access to all features in this GPL version
+The Collaboration Tunnel Protocol (TCT) is an open standard designed to build a more efficient and sustainable web for the AI era.
 
-**For Commercial AI Companies & Large-Scale Users:**
-- Commercial use at scale (>10,000 URLs/month) may require a separate patent license
-- Crawler operators, CDN providers, and AI companies processing TCT endpoints at scale should contact us for licensing terms
-- Contact: antunjurkovic@gmail.com
+The core protocol, as defined in **draft-jurkovikj-collab-tunnel**, is and always will be available for **anyone to implement** under a perpetual, irrevocable, **Royalty-Free (RF) license**. There is **no commercial licensing fee** for implementing the TCT standard.
+
+**Official IETF IPR Disclosure:** https://datatracker.ietf.org/ipr/7074/
+
+### Software License
+
+This implementation is licensed under **GPL v2+** (see [LICENSE](LICENSE)).
+
+✅ **You are FREE to:**
+- Use this code on any website
+- Modify the code
+- Distribute the code
+- Run the code in production at any scale
+- Study how it works
+
+### Patent Status
+
+**US Patent Application 63/895,763**
+- Title: "Method and System for a Collaborative, Resource-Efficient, and Verifiable Communication Tunnel"
+- Filed: October 8, 2025
+- Status: Patent Pending
+- Licensing: **Royalty-Free (RF)** under IETF IPR policy (RFC 8179)
+
+The provisional patent application covers the system and methods described in the TCT specification. Under the IETF Intellectual Property Rights policy, a Royalty-Free license is granted to all implementers of the standard.
 
 **Trademark Notice:**
 "Trusted Collaboration Tunnel" and "TCT" are pending trademark applications.
-
-**Note**: The patent-pending technology enables up to 90% bandwidth savings through sitemap-first verification and zero-fetch optimization. This GPL implementation is provided for website owners to benefit from these savings. Large-scale commercial users who build services around this protocol should obtain appropriate licensing.
 
 ## Specification & Resources
 
