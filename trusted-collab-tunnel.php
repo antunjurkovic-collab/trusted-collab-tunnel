@@ -3,7 +3,7 @@
  * Plugin Name: Trusted Collaboration Tunnel
  * Plugin URI: https://llmpages.org
  * Description: AI-optimized content delivery with sitemap-first discovery, template-invariant ETags, and 304 discipline. Reduces AI crawler bandwidth by 60-90%.
- * Version: 1.0.0
+ * Version: 2.1.0
  * Requires at least: 5.0
  * Requires PHP: 7.4
  * Author: Antun Jurkovikj
@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('TCT_VERSION', '1.0.0');
+define('TCT_VERSION', '2.1.0');
 define('TCT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('TCT_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -62,9 +62,73 @@ function tct_invalidate_sitemap_cache($post_id = null) {
     // Clear both old and new cache versions (for smooth upgrade)
     delete_transient('tct_sitemap_cache_v2');
     delete_transient('tct_sitemap_cache_v3');
+    delete_transient('tct_sitemap_json_v3');
+    delete_transient('tct_sitemap_etag_v3');
 
     // Also invalidate recent changes cache if implemented
     delete_transient('tct_sitemap_recent_cache_v2');
+}
+
+// PHASE 1.2: Precompute ETag + Payload on Save (wp-dual-native pattern)
+// Hook into save_post and status transitions to shift work to write path
+add_action('save_post', 'tct_precompute_etag', 10, 3);
+add_action('transition_post_status', 'tct_precompute_etag_status', 10, 3);
+
+/**
+ * Precompute ETag and payload when post changes (shift work to write path)
+ * Matches wp-dual-native pattern of computing CID on mutation
+ *
+ * @param int $post_id Post ID being saved
+ * @param WP_Post $post Post object
+ * @param bool $update Whether this is an update
+ */
+function tct_precompute_etag($post_id, $post, $update) {
+    // Guard against autosaves/revisions
+    if (wp_is_post_revision($post_id) || wp_is_post_autosave($post_id)) {
+        return;
+    }
+
+    // Scope to relevant post types (avoid work on posts not in TCT)
+    $blocked = apply_filters('tct_block_post_types', ['product']);
+    if ($post && is_array($blocked) && in_array($post->post_type, $blocked, true)) {
+        return;
+    }
+
+    // Clear old caches
+    delete_post_meta($post_id, '_tct_etag');
+    delete_transient('tct_payload_' . $post_id);
+
+    // Only precompute for published posts (skip drafts to save resources)
+    if ($post->post_status !== 'publish') {
+        return;
+    }
+
+    // Precompute new ETag + payload
+    $endpoint = trim(get_option('tct_endpoint_slug', 'llm'));
+    $c_url = get_permalink($post_id);
+    if (!$c_url) return;
+
+    $m_url = trailingslashit($c_url) . trailingslashit($endpoint);
+
+    list($payload, $hash) = tct_build_tct_payload_and_hash($post, $c_url, $m_url);
+
+    // Store for instant 200 or 304
+    update_post_meta($post_id, '_tct_etag', $hash);
+    set_transient('tct_payload_' . $post_id, $payload, WEEK_IN_SECONDS);
+}
+
+/**
+ * Handle publish/unpublish transitions
+ *
+ * @param string $new_status New post status
+ * @param string $old_status Old post status
+ * @param WP_Post $post Post object
+ */
+function tct_precompute_etag_status($new_status, $old_status, $post) {
+    // Precompute when publishing or unpublishing
+    if ($new_status === 'publish' || $old_status === 'publish') {
+        tct_precompute_etag($post->ID, $post, true);
+    }
 }
 
 

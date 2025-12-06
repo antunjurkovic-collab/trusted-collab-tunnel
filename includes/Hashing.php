@@ -5,21 +5,52 @@ if (!defined('ABSPATH')) { exit; }
  * Build the authoritative content string from the CMS (theme-independent).
  * Default: Title + blank line + body text (no HTML), UTF-8 plain text.
  * Filter 'tct_build_content_string' allows adding media text in deterministic order.
+ *
+ * PHASE 1.5: Uses parse_blocks() DIRECTLY - skips apply_filters('the_content')
+ * Benefits:
+ * - More stable: theme/template changes won't affect semantic content
+ * - Much faster: no shortcodes, embeds, or heavy filters
+ * - Better for AI: semantic content, not pixel output
  */
 function tct_build_content_string($post) {
-    $title = $post ? get_the_title($post) : '';
+    $title = get_the_title($post);
 
-    // Build body text from post content without HTML markup
-    $body_html = '';
-    if ($post) {
-        $body_html = apply_filters('the_content', $post->post_content);
-        if (!is_string($body_html) || trim($body_html) === '') {
-            $body_html = (string) $post->post_content;
+    // Use parse_blocks DIRECTLY - skip apply_filters('the_content')
+    $blocks = parse_blocks($post->post_content ?? '');
+    $body_parts = [];
+
+    foreach ($blocks as $block) {
+        // Skip empty/whitespace blocks
+        if (empty($block['blockName'])) {
+            continue;
+        }
+
+        // Extract text from innerHTML
+        if (!empty($block['innerHTML'])) {
+            $text = wp_strip_all_tags($block['innerHTML'], true);
+            $text = trim($text);
+            if ($text !== '') {
+                $body_parts[] = $text;
+            }
+        }
+
+        // Handle nested blocks
+        if (!empty($block['innerBlocks']) && is_array($block['innerBlocks'])) {
+            foreach ($block['innerBlocks'] as $inner) {
+                if (!empty($inner['innerHTML'])) {
+                    $text = wp_strip_all_tags($inner['innerHTML'], true);
+                    $text = trim($text);
+                    if ($text !== '') {
+                        $body_parts[] = $text;
+                    }
+                }
+            }
         }
     }
-    $body_text = wp_strip_all_tags((string)$body_html, true);
 
-    // Combine with deterministic separator (two newlines)
+    $body_text = implode("\n\n", $body_parts);
+
+    // Combine title + body
     $content = '';
     if ($title !== '') {
         $content .= $title . "\n\n";
@@ -183,7 +214,7 @@ function tct_build_tct_payload_and_hash($post, $c_url, $m_url) {
 
     // 2. Initial hash from canonical JSON of base payload
     $hash = tct_compute_hash_from_json($full);
-    $full['hash'] = $hash;
+    // NOTE: Per draft-02, DO NOT add 'hash' to payload (ETag header only)
 
     // 3. Allow an external provider to override or extend
     $payload = null;
@@ -217,7 +248,7 @@ function tct_build_tct_payload_and_hash($post, $c_url, $m_url) {
 
         // Recompute hash from final merged payload
         $hash = tct_compute_hash_from_json($payload);
-        $payload['hash'] = $hash;
+        // NOTE: Per draft-02, DO NOT add 'hash' to payload (ETag header only)
     } else {
         // No external override → use our full payload
         $payload = $full;

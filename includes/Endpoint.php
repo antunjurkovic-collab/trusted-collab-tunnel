@@ -135,12 +135,6 @@ function tct_output_llm_endpoint($canonical_path) {
         }
     }
 
-    // Use unified helper: ensures M-URL ETag == sitemap etag (expert review fix)
-    // This is the SINGLE SOURCE OF TRUTH for payload and hash computation
-    // Per expert: "Both sitemap and M-URL must derive from the same
-    // canonicalization/hashing pipeline."
-    list($payload, $hash) = tct_build_tct_payload_and_hash($post, $c_url, $m_url);
-
     // Optional auth
     if (tct_auth_required() && !tct_auth_ok()) {
         status_header(401);
@@ -148,37 +142,75 @@ function tct_output_llm_endpoint($canonical_path) {
         exit;
     }
 
+    // PHASE 1.1: 304 FAST-PATH - Check cached ETag BEFORE any payload work
+    // This implements the wp-dual-native pattern: check validators first, compute only if needed
+    $stored_etag = get_post_meta($post->ID, '_tct_etag', true);
+    if ($stored_etag) {
+        $inm = isset($_SERVER['HTTP_IF_NONE_MATCH']) ? trim($_SERVER['HTTP_IF_NONE_MATCH']) : '';
+        if ($inm) {
+            // Normalize ETags: strip quotes, weak prefix, handle comma-separated lists
+            foreach (explode(',', $inm) as $tok) {
+                $t = trim($tok);
+                // Strip weak prefix
+                if (stripos($t, 'W/') === 0) {
+                    $t = trim(substr($t, 2));
+                }
+                // Strip quotes
+                if (strlen($t) >= 2 && $t[0] === '"' && substr($t, -1) === '"') {
+                    $t = substr($t, 1, -1);
+                }
+
+                if ($t === $stored_etag) {
+                    // 304 EXIT - NO PAYLOAD BUILD!
+                    status_header(304);
+                    header('Content-Type: application/json; charset=UTF-8; profile="tct-1"', true);
+                    header('ETag: "' . $stored_etag . '"', true);
+                    header('Cache-Control: max-age=0, must-revalidate, stale-while-revalidate=60, stale-if-error=86400', true);
+                    header('Vary: Accept-Encoding', true);
+
+                    if (function_exists('tct_stats_record')) {
+                        tct_stats_record($m_url, 304, 0);
+                    }
+                    if (tct_receipts_enabled()) {
+                        tct_emit_usage_receipt($stored_etag, 304, 0);
+                    }
+                    exit;
+                }
+            }
+        }
+    }
+
+    // PHASE 1.3: Try cached payload first (hot path for 200 responses)
+    $cached_payload = get_transient('tct_payload_' . $post->ID);
+    $cache_hit = false;
+
+    if ($cached_payload && $stored_etag) {
+        // Serve from cache (hot 200 path)
+        $payload = $cached_payload;
+        $hash = $stored_etag;
+        $cache_hit = true;
+    } else {
+        // Compute fresh (cold path - cache miss or first request)
+        // Use unified helper: ensures M-URL ETag == sitemap etag (expert review fix)
+        // This is the SINGLE SOURCE OF TRUTH for payload and hash computation
+        list($payload, $hash) = tct_build_tct_payload_and_hash($post, $c_url, $m_url);
+
+        // Cache for next time
+        update_post_meta($post->ID, '_tct_etag', $hash);
+        set_transient('tct_payload_' . $post->ID, $payload, WEEK_IN_SECONDS);
+        $cache_hit = false;
+    }
+
     // CRITICAL: Clear 404 flag early
     if (isset($GLOBALS['wp_query'])) {
         $GLOBALS['wp_query']->is_404 = false;
     }
 
-    // Conditional GET check FIRST - before sending ANY headers or setting status
-    $inm = isset($_SERVER['HTTP_IF_NONE_MATCH']) ? trim((string)$_SERVER['HTTP_IF_NONE_MATCH']) : '';
-    $match_inm = false;
-    if ($inm) {
-        foreach (explode(',', $inm) as $tok) {
-            $t = trim($tok);
-            if (stripos($t, 'W/') === 0) { $t = trim(substr($t, 2)); }
-            if (strlen($t) >= 2 && $t[0] === '"' && substr($t, -1) === '"') { $t = substr($t, 1, -1); }
-            if ($t === $hash) { $match_inm = true; break; }
-        }
-    }
-    if ($match_inm) {
-        status_header(304);
-        header('ETag: "' . $hash . '"', true);
-        header('Cache-Control: max-age=0, must-revalidate, stale-while-revalidate=60, stale-if-error=86400', true);
-        // Stats and optional receipt on 304
-        if (function_exists('tct_stats_record')) { tct_stats_record($m_url, 304, 0); }
-        if (tct_receipts_enabled()) { tct_emit_usage_receipt($hash, 304, 0); }
-        exit;
-    }
-
     // No match - send 200 response with full headers
     status_header(200);
 
-    // Common headers for both HEAD and GET
-    header('Content-Type: application/json; charset=UTF-8', true);
+    // PHASE 1.4: Common headers for both HEAD and GET (with profile parameter per draft-02)
+    header('Content-Type: application/json; charset=UTF-8; profile="tct-1"', true);
     header('Link: <' . esc_url_raw($c_url) . '>; rel="canonical"', false);
     header('ETag: "' . $hash . '"', true);
     // Allow CDN/shared cache revalidation while maintaining freshness
@@ -201,6 +233,13 @@ function tct_output_llm_endpoint($canonical_path) {
     // Note: PHP json_encode preserves key insertion order (deterministic for our payload)
     $body = wp_json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     $blen = strlen($body);
+
+    // Per draft-02: Add Content-Digest header (RFC 9530) for integrity
+    // Format: Content-Digest: sha-256=:base64hash:
+    $body_hash_bin = hash('sha256', $body, true);  // Binary hash
+    $body_hash_b64 = base64_encode($body_hash_bin);
+    header('Content-Digest: sha-256=:' . $body_hash_b64 . ':', false);
+
     if (function_exists('tct_stats_record')) { tct_stats_record($m_url, 200, $blen); }
     $modified = $post ? get_post_modified_time('c', true, $post) : gmdate('c');
     if (function_exists('tct_record_change')) { tct_record_change($post, $c_url, $m_url, $hash, $modified); }
@@ -346,6 +385,11 @@ function tct_build_full_payload($post, $c_url, $m_url, $hash) {
     $published = $post ? get_post_time('c', true, $post) : null;
     $slug = $post ? $post->post_name : null;
 
+    // Per draft-02: content_media_type specifies content format
+    // Default: text/plain (plain text, no HTML)
+    // Sites can filter to change to text/markdown if needed
+    $content_media_type = apply_filters('tct_content_media_type', 'text/plain; charset=utf-8', $post);
+
     $payload = [
         'profile' => 'tct-1',
         'llm_url' => $m_url,
@@ -353,6 +397,7 @@ function tct_build_full_payload($post, $c_url, $m_url, $hash) {
         'post_id' => $post ? intval($post->ID) : null,
         'post_type' => $post ? $post->post_type : null,
         'title' => $title,
+        'content_media_type' => $content_media_type,  // Per draft-02: NEW REQUIRED FIELD
         'modified' => $modified,
         'published' => $published,
         'word_count' => $wc,
@@ -367,10 +412,9 @@ function tct_build_full_payload($post, $c_url, $m_url, $hash) {
         'content' => $content_text,
     ];
 
-    // Add hash only if provided (used after hash computation)
-    if ($hash !== null) {
-        $payload['hash'] = $hash;
-    }
+    // NOTE: Per draft-02, 'hash' field is REMOVED from JSON payload
+    // The ETag header is now the sole validator (no redundant hash in body)
+    // Kept $hash parameter for backwards compatibility but don't include in payload
     // Allow site owners to force full content regardless of third-party filters
     $force = (int) get_option('tct_force_full_content', 1) === 1;
     if (!$force) {
