@@ -1,320 +1,80 @@
-# Trusted Collaboration Tunnel (TCT) — WordPress Plugin (Reference)
+﻿# Trusted Collaboration Tunnel (TCT) — Draft-03 Alpha WordPress Reference
 
-**Version: 2.1.0** | **Specification: draft-jurkovikj-collab-tunnel-02**
+**Version: 3.0.0-alpha.1** | **Target specification: draft-jurkovikj-collab-tunnel-03 internal**
 
-A minimal, install-and-go plugin that exposes a deterministic machine endpoint (M_URL) for each canonical page (C_URL), with validator discipline and sitemap-first skip. Optional trust extensions add policy links, access control, and usage receipts.
+This branch is a draft-03 alignment workspace for the WordPress TCT reference plugin. It is not the published draft-02 implementation and should not be described as production-grade yet.
 
-## What's New in v2.1.0 (Performance Release)
+TCT, in draft-03 wording, means **Collaboration Content Transfer**. Earlier deployments used "Trusted Collaboration Tunnel" / "Collaboration Tunnel" naming. This plugin keeps the historical plugin name while aligning the wire surface toward draft-03.
 
-Version 2.1.0 implements production-grade performance optimizations based on the wp-dual-native pattern (precompute on write, fast-path on read, validator discipline):
+## Core Draft-03 Surface
 
-### Performance Improvements
+Core TCT features in this branch:
 
-**M-URL Endpoints:**
-- ✅ **304 Fast-Path**: Checks cached ETag BEFORE building payload - exits immediately if If-None-Match matches
-- ✅ **Precompute on Save**: Stores ETag + payload in post meta/transients when content changes
-- ✅ **Cached Payload Serving**: Serves pre-built payloads from transients (WEEK_IN_SECONDS TTL)
-- ✅ **Optimized Content Assembly**: Uses `parse_blocks()` directly instead of `apply_filters('the_content')` - 30-50% faster and template-invariant
+- C-URL to M-URL mapping for selected WordPress content.
+- M-URL JSON envelopes with `profile: "tct-1"`.
+- Strong HTTP `ETag` values derived from deterministic canonical JSON bytes.
+- M-URL response bodies emitted using the same deterministic JSON bytes used for ETag hashing.
+- `Content-Digest` integrity headers on 200 M-URL responses.
+- `Link: rel="canonical"` from M-URL back to C-URL.
+- Root discovery Link header with `profile="tct-1"`.
+- M-Sitemap at `/llm-sitemap.json` with version `2`, `profile`, `cUrl`, `mUrl`, `etag`, and `lastModified`.
+- Conditional `GET` with `If-None-Match` and `304 Not Modified`.
 
-**Sitemap:**
-- ✅ **304 Fast-Path**: Checks cached sitemap + strong ETag BEFORE any queries
-- ✅ **Read ETags from Post Meta**: Turns O(N × expensive) into O(N × cheap lookup) - no regeneration
-- ✅ **Optimized Queries**: Added `no_found_rows=true`, `update_post_term_cache=false`, `update_post_meta_cache=false`
-- ✅ **Strong ETag Caching**: Computes sha256 ETag from final JSON bytes, caches both JSON + ETag
+## Non-Core Extensions
 
-**HTTP Polish:**
-- ✅ **Content-Type Profiles**: `application/json; charset=UTF-8; profile="tct-1"`
-- ✅ **Content-Digest Headers**: RFC 9530 compliance on all 200 responses
-- ✅ **HEAD Support**: Proper HEAD handling on all endpoints
-- ✅ **Vary Headers**: Cache-safe with `Vary: Accept-Encoding`
+These features are deployment extensions, not core TCT conformance requirements:
 
-### Measured Performance (Production)
+- `/llm-policy.json`
+- `AI-Usage-Receipt` headers
+- `/llm-stats.json`
+- `/llm-changes.json`
+- `/llms.txt`
+- admin cache/status utilities
 
-**Bandwidth Savings:**
-- Sitemap 304 responses: **0 bytes** (vs ~400 KB for 200) = **100% bandwidth reduction**
-- M-URL 304 responses: **0 bytes** (vs ~2.4 KB for 200) = **100% bandwidth reduction**
+Stats and change-feed DB writes are disabled by default in this branch through:
 
-**Response Times (includes network + all caching layers):**
-- Sitemap 304: **~1.1s** (consistent, zero bytes transferred)
-- M-URL 304: **~1.1s** (consistent, zero bytes transferred)
-- All responses served from cache (LiteSpeed + transients)
+- `tct_stats_enabled = 0`
+- `tct_changes_enabled = 0`
 
-**Zero-Fetch Efficiency:**
-AI crawlers sending `If-None-Match` headers receive instant 304 responses with zero payload transfer, reducing bandwidth by 99%+ on repeat visits to unchanged content.
+Receipts are disabled by default and sanitize `X-AI-Contract` to a narrow header-safe identifier grammar before emitting receipt headers.
 
-## Licensing & Patent Notice
+## Draft-03 Alignment Notes
 
-### An Open, Royalty-Free Standard
+This branch intentionally differs from the draft-02 plugin surface:
 
-The Collaboration Tunnel Protocol (TCT) is an open standard designed to build a more efficient and sustainable web for the AI era.
+- Sitemap advisory timestamp field is `lastModified`, not `modified`.
+- Legacy `contentHash` and body `hash` fields are not emitted.
+- Root discovery includes `profile="tct-1"`.
+- Policy, receipt, stats, and changes are explicitly non-core extensions.
+- Broad `/llm/` substring 404 suppression was narrowed to exact TCT route shapes.
 
-The core protocol, as defined in **draft-jurkovikj-collab-tunnel**, is and always will be available for **anyone to implement** under a perpetual, irrevocable, **Royalty-Free (RF) license**. There is **no commercial licensing fee** for implementing the TCT standard.
+## Current Status
 
-**Official IETF IPR Disclosure:** https://datatracker.ietf.org/ipr/7074/
-
-### Software License
+This is an alpha alignment branch. Before a public draft-03 release, still validate:
 
-This implementation is licensed under **GPL v2+** (see [LICENSE](LICENSE)).
+- live install behavior;
+- canonical JSON byte / ETag parity;
+- sitemap field shape;
+- 200/304 behavior;
+- extension-off default behavior;
+- receipt header escaping;
+- large-site sitemap/index strategy.
 
-✅ **You are FREE to:**
-- Use this code on any website
-- Modify the code
-- Distribute the code
-- Run the code in production at any scale
-- Study how it works
+## Install
 
-### Patent Status
+Copy the plugin folder to `wp-content/plugins/` and activate it in WordPress admin.
 
-**US Patent Application 63/895,763**
-- Title: "Method and System for a Collaborative, Resource-Efficient, and Verifiable Communication Tunnel"
-- Filed: October 8, 2025
-- Status: Patent Pending
-- Licensing: **Royalty-Free (RF)** under IETF IPR policy (RFC 8179)
+Default endpoints:
 
-The provisional patent application covers the system and methods described in the TCT specification. Under the IETF Intellectual Property Rights policy, a Royalty-Free license is granted to all implementers of the standard.
+- `/llm-sitemap.json`
+- `/{canonical}/llm/`
+- `/llm-policy.json` extension
+- `/llms.txt` extension
 
-**Trademark Notice:**
-"Trusted Collaboration Tunnel" and "TCT" are pending trademark applications.
+## Security Notes
 
-## Specification & Resources
-
-This plugin implements the Collaboration Tunnel Protocol (TCT):
-- 📄 **Full Specification:** https://github.com/antunjurkovic-collab/collab-tunnel-spec
-- 📦 **Python Client Library:** https://pypi.org/project/collab-tunnel/
-- 🔍 **Protocol Validator:** https://llmpages.org/validator/
-
-### Measured Results
-Based on 970 URLs across 3 production sites:
-- **83% bandwidth savings** (103 KB → 17.7 KB average)
-- **86% token reduction** (13,900 → 1,960 tokens)
-- **90%+ skip rate** for unchanged content
-- **100% protocol compliance**
-
-## Protocol Endpoints
-
-- Endpoint: `{canonical}/llm/` (configurable via `tct_endpoint_slug`)
-- Sitemap: `/llm-sitemap.json`
-- Manifest: `/llms.txt`
-- Headers on M_URL: `Link: <C_URL>; rel="canonical"`, `ETag: "sha256-…"`, `Cache-Control: max-age=0, must-revalidate, stale-while-revalidate=60, stale-if-error=86400`, `Vary: Accept-Encoding`
-- Conditional GET: honors `If-None-Match` and returns `304` (no body) on match; works for HEAD and GET
-
-**Note on ETags and Hash Computation:** This implementation uses TCT Method B (Content-Locked Strong-Content) where the hash is computed from normalized content text, not JSON bytes. This produces template-invariant hashes: the same article content generates the same ETag regardless of HTML presentation or theme changes. All JSON fields are deterministic functions of content, ensuring RFC 9110 compliance for strong ETags. See draft-jurkovikj-collab-tunnel-00 Section "Strong ETag and Parity (Normative)" for detailed semantics.
-
-### M-URL JSON Response Format (draft-02)
-
-```json
-{
-  "profile": "tct-1",
-  "llm_url": "https://example.com/post/llm/",
-  "canonical_url": "https://example.com/post/",
-  "post_id": 123,
-  "post_type": "post",
-  "title": "Post Title",
-  "content_media_type": "text/plain; charset=utf-8",
-  "modified": "2025-10-15T14:30:00Z",
-  "published": "2025-10-10T10:00:00Z",
-  "word_count": 850,
-  "excerpt": "Brief summary...",
-  "content": "Core article content..."
-}
-```
-
-**Key Changes in draft-02:**
-- ✅ `hash` field **REMOVED** from JSON (ETag header is now the sole validator)
-- ✅ `content_media_type` field **ADDED** (specifies content format)
-- ✅ `llm_url` field explicitly included
-
-**Profile Field:** The `"profile": "tct-1"` field enables protocol versioning. Future versions (e.g., `tct-2`) can introduce new fields while maintaining backward compatibility.
-
-### Sitemap JSON Format (draft-02)
-
-```json
-{
-  "version": 2,
-  "profile": "tct-1",
-  "items": [
-    {
-      "cUrl": "https://example.com/post/",
-      "mUrl": "https://example.com/post/llm/",
-      "modified": "2025-10-23T18:00:00Z",
-      "etag": "sha256-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    }
-  ]
-}
-```
-
-**Key Changes in draft-02:**
-- ✅ `version` field updated to **2**
-- ✅ `contentHash` renamed to `etag` (consistent naming with HTTP headers)
-
-## Optional Trust Extensions (off by default)
-- Policy links: `Link: <…>; rel="terms-of-service"`, `Link: <…>; rel="payment"` (set options `tct_terms_url`, `tct_pricing_url`) — Note: for backward compatibility, the plugin also accepts legacy `rel="terms"` and `rel="pricing"` from origin
-- Auth: `tct_auth_mode = off|api_key`, with `tct_api_keys = ["key1","key2"]`
-- Usage receipts: `AI-Usage-Receipt: contract=…; status=200|304; bytes=…; etag="…"; ts=…; sig=base64(hmac)` when `tct_receipts_enabled = 1` and `tct_receipt_hmac_key` set
-
-## AI Policy Descriptor (AIPREF Alignment)
-
-**NEW:** Machine-readable policy at `/llm-policy.json` aligned with IETF AIPREF working group priorities.
-
-### Policy Descriptor JSON
-
-Every M-URL now includes a Link header pointing to the policy descriptor:
-
-```http
-Link: </llm-policy.json>; rel="describedby"; type="application/json"
-```
-
-The policy descriptor provides structured information about AI usage preferences:
-
-```json
-{
-  "profile": "tct-policy-1",
-  "version": 1,
-  "effective": "2025-10-25T10:00:00Z",
-  "updated": "2025-10-25T10:00:00Z",
-  "policy_urls": {
-    "terms_of_service": "https://example.com/terms",
-    "payment_info": "https://example.com/pricing",
-    "contact": "https://example.com/contact"
-  },
-  "purposes": {
-    "allow_ai_input": true,
-    "allow_ai_train": false,
-    "allow_search_indexing": true
-  },
-  "requirements": {
-    "attribution_required": true,
-    "link_back_required": false,
-    "notice_required": true
-  },
-  "rate_hints": {
-    "max_requests_per_second": null,
-    "max_requests_per_day": 10000,
-    "note": "Advisory limits, honor system"
-  },
-  "extensions": {}
-}
-```
-
-### Configuration
-
-Configure via **WordPress Admin → Settings → TCT → AI Policy Descriptor**:
-
-- **Contact URL**: Where AI systems can reach you
-- **Permitted AI Purposes**:
-  - AI Input (assistants, chatbots) — Default: enabled
-  - AI Training (model fine-tuning) — Default: disabled
-  - Search Indexing (Perplexity, Bing, Google) — Default: enabled
-- **AI Usage Requirements**:
-  - Attribution Required — Default: enabled
-  - Link-Back Required — Default: disabled
-  - Notice Required — Default: enabled
-- **Advisory Rate Limits**:
-  - Max requests/second (0 = no limit)
-  - Max requests/day (default: 10,000)
-
-### llms.txt Integration
-
-The policy descriptor is automatically referenced in `/llms.txt`:
-
-```
-## Machine-Readable Policy
-- https://example.com/llm-policy.json - Policy descriptor (JSON)
-
-The policy descriptor provides structured information about:
-- Allowed purposes (AI input, training, search indexing)
-- Requirements (attribution, notice)
-- Advisory rate limits
-
-## AI Preferences
-# Aligned with emerging standards (Cloudflare Content Signals)
-- AI-Input: allowed
-- AI-Train: prohibited
-- Search: allowed
-```
-
-**Note**: If using a static llms.txt file, regenerate it after changing policy settings to ensure the AI Preferences section reflects your current configuration. The virtual endpoint (recommended) always stays in sync automatically.
-
-### AIPREF Alignment
-
-This implementation follows IETF AIPREF working group priorities:
-
-- ✅ Uses IANA-registered `rel="describedby"` (not custom relations)
-- ✅ Vocabulary-agnostic design ready for AIPREF finalization (August 2025)
-- ✅ Extensions object for future standards mapping
-- ✅ Explicit versioning with `tct-policy-1` profile
-- ✅ Compatible with Cloudflare Content Signals (ai-input, ai-train, search)
-
-**Note**: Policy defaults favor restrictive settings (AI Input: yes, Training: no) aligned with publisher interests.
-
-## Integration with llm-pages (optional)
-If another plugin can provide the JSON payload and content hash, hook:
-
-```php
-add_filter('tct_build_payload', function($ret, $post, $c_url, $m_url){
-  // Compute $payload and $hash using your normalization
-  return [ 'payload' => $payload, 'hash' => $hash ];
-}, 10, 4);
-```
-
-## Security Considerations
-
-**Before deploying to production, review [SECURITY.md](SECURITY.md) for complete security guidance.**
-
-### Key Security Points
-
-**Authentication:**
-- Default mode (`tct_auth_mode = off`) allows public access to machine endpoints
-- Use API key mode only for sensitive content: `tct_auth_mode = api_key`
-- API keys must be 32+ characters, cryptographically random, stored securely
-
-**HMAC Keys:**
-- Usage receipts require `tct_receipt_hmac_key` (32+ bytes minimum)
-- Never commit keys to version control
-- Rotate keys regularly (every 90 days recommended)
-
-**PII and Privacy:**
-- Machine JSON may contain personally identifiable information from post content
-- Review content before enabling TCT on posts with PII
-- Use `tct_build_payload` filter to redact sensitive data
-
-**Server Configuration:**
-- Enable HTTPS only (required for API keys and receipts)
-- Allowlist `/llm-sitemap.json` and `/*/llm/` in WAF/Cloudflare
-- Allow HEAD method (some WAFs block by default)
-- Configure robots.txt to permit `/llm*` paths
-
-**Responsible Disclosure:**
-- Security vulnerabilities: Email antunjurkovic@gmail.com with subject "SECURITY: TCT WordPress Plugin"
-- Do NOT open public issues for security bugs
-- See [SECURITY.md](SECURITY.md) for disclosure timeline
-
-## Licensing
-
-**Code License:** GPL v2+ (see [LICENSE](LICENSE))
-**Patent Rights:** See [PATENTS.md](PATENTS.md) for patent licensing information
-
-The GPL v2+ license covers the source code. Patent rights are a separate matter detailed in PATENTS.md.
-
-## Notes
-- This directory is a reference implementation; drop it into `wp-content/plugins/` to run on a WP site.
-- For production, consider adding rewrite rules on activation; this reference uses `template_redirect` path interception.
-
-## Future-Ready Push Discovery (Optional)
-
-TCT is fully effective on its own (the 4-part method: handshake, template-invariant ETag, validator discipline with `304`, and sitemap-first skipping). When faster discovery is desirable, TCT can be complemented by optional push mechanisms without changing the core contract:
-
-- IndexNow (search engine change hints)
-  - Purpose: notify participating engines immediately when URLs change.
-  - How it complements TCT: engines learn about changes sooner, then revalidate `{canonical}/llm/` using `HEAD` + `If-None-Match` to get `304` when unchanged.
-  - When to use: time-sensitive content, high-volume publishing, or when reducing stale windows is important.
-
-- WebSub (real-time hub notifications)
-  - Purpose: publish change notifications to a hub; subscribers receive near–real-time pings.
-  - How it complements TCT: partners subscribe to a change topic (e.g., `/llm-changes.json`) and fetch only on change, leveraging `ETag` parity and `304` discipline.
-  - When to use: you have identifiable subscribers/partners who want instant updates.
-
-Notes
-- These are accelerators, not requirements. Delivery stays the same: JSON at `{canonical}/llm/`, `Link: rel="canonical"`, `ETag` from normalized content, `Cache-Control: must-revalidate`, and strict `304` on `If-None-Match`.
-- Monetization/accounting is unchanged: policy/pricing links, optional API-key access, and signed `AI-Usage-Receipt` headers continue to apply.
-- Implementation is deferred in this reference; sites can add them later without modifying TCT’s core behavior.
+- Public mode is intended only for public content.
+- If a C-URL requires authentication, protect its corresponding M-URL similarly.
+- Treat policy, receipt, stats, and changes endpoints as deployment extensions.
+- Do not place secrets in repository files.
+- Use HTTPS for M-URLs and M-Sitemaps.

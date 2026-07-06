@@ -3,7 +3,7 @@
  * Plugin Name: Trusted Collaboration Tunnel
  * Plugin URI: https://llmpages.org
  * Description: AI-optimized content delivery with sitemap-first discovery, template-invariant ETags, and 304 discipline. Reduces AI crawler bandwidth by 60-90%.
- * Version: 2.1.0
+ * Version: 3.0.0-alpha.1
  * Requires at least: 5.0
  * Requires PHP: 7.4
  * Author: Antun Jurkovikj
@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('TCT_VERSION', '2.1.0');
+define('TCT_VERSION', '3.0.0-alpha.1');
 define('TCT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('TCT_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -139,16 +139,17 @@ add_filter('pre_handle_404', 'tct_prevent_404_on_endpoints', 10, 2);
 function tct_prevent_404_on_endpoints($preempt, $wp_query) {
     $endpoint = trim(get_option('tct_endpoint_slug', 'llm'));
     $uri = $_SERVER['REQUEST_URI'] ?? '';
+    $path = parse_url($uri, PHP_URL_PATH);
+    if (!is_string($path)) {
+        return $preempt;
+    }
+    $path = '/' . ltrim($path, '/');
 
-    // Check if this is an M-URL or TCT endpoint
+    // Check exact TCT singleton endpoints and exact M-URL patterns only.
     $is_tct_request = (
-        strpos($uri, '/' . $endpoint . '/') !== false ||
-        strpos($uri, '/llm-sitemap.json') !== false ||
-        strpos($uri, '/llm-policy.json') !== false ||
-        strpos($uri, '/llm-manifest.json') !== false ||
-        strpos($uri, '/llm-stats.json') !== false ||
-        strpos($uri, '/llm-changes.json') !== false ||
-        strpos($uri, '/llms.txt') !== false
+        in_array($path, array('/llm-sitemap.json', '/llm-policy.json', '/llm-manifest.json', '/llm-stats.json', '/llm-changes.json', '/llms.txt'), true) ||
+        preg_match('~^/' . preg_quote($endpoint, '~') . '/?$~', $path) ||
+        preg_match('~^/.+?/' . preg_quote($endpoint, '~') . '/?$~', $path)
     );
 
     if ($is_tct_request) {
@@ -168,15 +169,14 @@ function tct_clear_404_fallback() {
     
     $endpoint = trim(get_option('tct_endpoint_slug', 'llm'));
     $uri = $_SERVER['REQUEST_URI'] ?? '';
+    $path = parse_url($uri, PHP_URL_PATH);
+    if (!is_string($path)) return;
+    $path = '/' . ltrim($path, '/');
 
     $is_tct_request = (
-        strpos($uri, '/' . $endpoint . '/') !== false ||
-        strpos($uri, '/llm-sitemap.json') !== false ||
-        strpos($uri, '/llm-policy.json') !== false ||
-        strpos($uri, '/llm-manifest.json') !== false ||
-        strpos($uri, '/llm-stats.json') !== false ||
-        strpos($uri, '/llm-changes.json') !== false ||
-        strpos($uri, '/llms.txt') !== false
+        in_array($path, array('/llm-sitemap.json', '/llm-policy.json', '/llm-manifest.json', '/llm-stats.json', '/llm-changes.json', '/llms.txt'), true) ||
+        preg_match('~^/' . preg_quote($endpoint, '~') . '/?$~', $path) ||
+        preg_match('~^/.+?/' . preg_quote($endpoint, '~') . '/?$~', $path)
     );
 
     if ($is_tct_request && $wp_query->is_404) {
@@ -208,7 +208,7 @@ function tct_add_root_link_header() {
     // Send Link header per draft-jurkovikj-collab-tunnel-01 Section 4.1
     // MUST include: rel="index" and type="application/json"
     header(
-        'Link: <' . esc_url_raw(home_url($sitemap_path)) . '>; rel="index"; type="application/json"',
+        'Link: <' . esc_url_raw(home_url($sitemap_path)) . '>; rel="index"; type="application/json"; profile="tct-1"',
         false
     );
 }
@@ -227,6 +227,8 @@ register_activation_hook(__FILE__, function() {
     add_option('tct_api_keys', []); // array of strings
     add_option('tct_receipts_enabled', 0);
     add_option('tct_receipt_hmac_key', '');
+    add_option('tct_stats_enabled', 0);
+    add_option('tct_changes_enabled', 0);
     add_option('tct_root_rewrite_enabled', 1);
     add_option('tct_force_full_content', 1);
     add_option('tct_include_headings', 1);

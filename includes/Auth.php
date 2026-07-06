@@ -25,8 +25,11 @@ function tct_auth_ok() {
     }
     $x_api_key = $_SERVER['HTTP_X_API_KEY'] ?? ($hdrs['X-API-Key'] ?? '');
 
-    if ($bearer && in_array($bearer, $api_keys, true)) { return true; }
-    if ($x_api_key && in_array($x_api_key, $api_keys, true)) { return true; }
+    foreach ($api_keys as $key) {
+        $key = is_string($key) ? $key : '';
+        if ($key !== '' && $bearer !== '' && hash_equals($key, $bearer)) { return true; }
+        if ($key !== '' && $x_api_key !== '' && hash_equals($key, $x_api_key)) { return true; }
+    }
 
     /**
      * Filter for custom auth validation (e.g., JWT). Return true to accept.

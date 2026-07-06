@@ -147,45 +147,44 @@ function tct_canonicalize_json($data) {
 }
 
 /**
- * Compute SHA-256 hash from canonical JSON (Method A per draft-01).
+ * Encode payload using the deterministic JSON bytes used for TCT validators.
  *
- * IMPORTANT: This ensures deterministic key ordering to prevent hash drift.
+ * This is a pragmatic PHP implementation of the draft-03 requirement that the
+ * same canonical JSON bytes are used for both the M-URL response body and the
+ * strong ETag computation. It sorts object keys at every level and emits JSON
+ * without insignificant whitespace.
  *
- * Per draft-jurkovikj-collab-tunnel-01 Section 6.2:
+ * @param array $payload Associative array (WITHOUT 'hash' field)
+ * @return string Canonical JSON bytes, or an empty JSON object on failure
+ */
+function tct_canonical_json_encode($payload) {
+    $clean = is_array($payload) ? $payload : [];
+    unset($clean['hash']);
+
+    $canonical_data = tct_canonicalize_json($clean);
+    $canonical = wp_json_encode($canonical_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+    if ($canonical === false) {
+        $canonical = wp_json_encode($canonical_data, JSON_UNESCAPED_SLASHES);
+    }
+
+    return $canonical === false ? '{}' : $canonical;
+}
+
+/**
+ * Compute SHA-256 hash from canonical JSON bytes.
+ *
+ * Per draft-jurkovikj-collab-tunnel-03:
  * 1. Build payload object WITHOUT hash field
- * 2. Canonicalize to UTF-8 bytes (deterministic JSON with sorted keys)
+ * 2. Canonicalize to UTF-8 bytes
  * 3. Compute SHA-256
  * 4. Return as "sha256-<64hex>"
- *
- * Per draft-01 Section 6.1: Implementations SHOULD use RFC8785, or ensure
- * stable key ordering. This implementation uses lexicographic key sorting
- * at all nesting levels to guarantee deterministic hashes.
  *
  * @param array $payload Associative array (WITHOUT 'hash' field)
  * @return string Hash in format "sha256-<hex>"
  */
 function tct_compute_hash_from_json($payload) {
-    // Remove hash field if accidentally included
-    $clean = $payload;
-    unset($clean['hash']);
-
-    // Canonicalize: sort keys at all levels for deterministic hashing
-    $canonical_data = tct_canonicalize_json($clean);
-
-    // Serialize to JSON with deterministic flags
-    $canonical = wp_json_encode($canonical_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-
-    if ($canonical === false) {
-        // Fallback: try without Unicode unescaping
-        $canonical = wp_json_encode($canonical_data, JSON_UNESCAPED_SLASHES);
-        if ($canonical === false) {
-            // Last resort: return error hash
-            return 'sha256-' . str_repeat('0', 64);
-        }
-    }
-
-    $hex = hash('sha256', $canonical);
-    return 'sha256-' . $hex;
+    return 'sha256-' . hash('sha256', tct_canonical_json_encode($payload));
 }
 
 /**
@@ -214,20 +213,17 @@ function tct_build_tct_payload_and_hash($post, $c_url, $m_url) {
 
     // 2. Initial hash from canonical JSON of base payload
     $hash = tct_compute_hash_from_json($full);
-    // NOTE: Per draft-02, DO NOT add 'hash' to payload (ETag header only)
+    // NOTE: Per draft-03, DO NOT add 'hash' to payload (ETag header only)
 
     // 3. Allow an external provider to override or extend
     $payload = null;
     $filtered = apply_filters('tct_build_payload', null, $post, $c_url, $m_url);
 
-    if (is_array($filtered) && isset($filtered['payload'], $filtered['hash'])) {
-        // Fully provided: trust but ensure consistency
+    if (is_array($filtered) && isset($filtered['payload'])) {
+        // Fully provided payload. Draft-03 requires the ETag to be derived from
+        // the final representation bytes, so ignore caller-provided hashes.
         $payload = $filtered['payload'];
-        $hash = $filtered['hash'];
-
-        // Optional paranoid check: recompute and verify
-        // $check = tct_compute_hash_from_json($payload);
-        // if ($check !== $hash) { $hash = $check; $payload['hash'] = $hash; }
+        $hash = tct_compute_hash_from_json($payload);
     } elseif (is_array($filtered)) {
         // Partial override: merge with our full payload
         $payload = $filtered;
@@ -248,9 +244,9 @@ function tct_build_tct_payload_and_hash($post, $c_url, $m_url) {
 
         // Recompute hash from final merged payload
         $hash = tct_compute_hash_from_json($payload);
-        // NOTE: Per draft-02, DO NOT add 'hash' to payload (ETag header only)
+        // NOTE: Per draft-03, DO NOT add 'hash' to payload (ETag header only)
     } else {
-        // No external override → use our full payload
+        // No external override â†’ use our full payload
         $payload = $full;
         // $hash already set
     }

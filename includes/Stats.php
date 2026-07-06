@@ -23,6 +23,9 @@ function tct_stats_save_store($store) {
 }
 
 function tct_stats_record($m_url, $status, $body_len = 0) {
+    if (!(bool) get_option('tct_stats_enabled', 0)) {
+        return;
+    }
     if (!is_string($m_url) || $m_url === '') return;
     $store = tct_stats_get_store();
     $store['requests'] += 1;

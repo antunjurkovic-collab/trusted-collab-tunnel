@@ -16,6 +16,9 @@ function tct_changes_save($changes) {
 }
 
 function tct_record_change($post, $c_url, $m_url, $etag, $modified_iso) {
+    if (!(bool) get_option('tct_changes_enabled', 0)) {
+        return;
+    }
     $changes = tct_changes_get();
     array_unshift($changes, [
         'cUrl' => $c_url,

@@ -75,7 +75,7 @@ function tct_handle_requests() {
     // 5) Page endpoint */{endpoint}/ including root /{endpoint}/
     $root_pattern = '~^/?' . preg_quote($endpoint, '~') . '/?$~';
     if (preg_match($root_pattern, ltrim($req_path, '/'))) {
-        // Root mapping: /llm/ → canonical /
+        // Root mapping: /llm/ â†’ canonical /
         tct_output_llm_endpoint('/');
         exit;
     }
@@ -209,7 +209,7 @@ function tct_output_llm_endpoint($canonical_path) {
     // No match - send 200 response with full headers
     status_header(200);
 
-    // PHASE 1.4: Common headers for both HEAD and GET (with profile parameter per draft-02)
+    // PHASE 1.4: Common headers for both HEAD and GET (with profile parameter per draft-03)
     header('Content-Type: application/json; charset=UTF-8; profile="tct-1"', true);
     header('Link: <' . esc_url_raw($c_url) . '>; rel="canonical"', false);
     header('ETag: "' . $hash . '"', true);
@@ -228,13 +228,11 @@ function tct_output_llm_endpoint($canonical_path) {
     }
 
 
-    // Deterministic JSON serialization per TCT spec
-    // JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ensures consistent encoding
-    // Note: PHP json_encode preserves key insertion order (deterministic for our payload)
-    $body = wp_json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    // Draft-03: send the same canonical JSON bytes used for strong ETag generation.
+    $body = tct_canonical_json_encode($payload);
     $blen = strlen($body);
 
-    // Per draft-02: Add Content-Digest header (RFC 9530) for integrity
+    // Per draft-03: Add Content-Digest header (RFC 9530) for integrity
     // Format: Content-Digest: sha-256=:base64hash:
     $body_hash_bin = hash('sha256', $body, true);  // Binary hash
     $body_hash_b64 = base64_encode($body_hash_bin);
@@ -267,7 +265,7 @@ function tct_build_full_payload($post, $c_url, $m_url, $hash) {
     if ($excerpt !== '') {
         // Remove the common WP token like "[&hellip;]" and unicode ellipsis
         $excerpt = preg_replace('/\[\s*&hellip;\s*\]/i', '', $excerpt);
-        $excerpt = str_replace(['&hellip;', '…'], '', $excerpt);
+        $excerpt = str_replace(['&hellip;', 'â€¦'], '', $excerpt);
         $excerpt = trim($excerpt);
     }
     if (($excerpt === '' || strlen($excerpt) < 10) && $content_text !== '') {
@@ -385,7 +383,7 @@ function tct_build_full_payload($post, $c_url, $m_url, $hash) {
     $published = $post ? get_post_time('c', true, $post) : null;
     $slug = $post ? $post->post_name : null;
 
-    // Per draft-02: content_media_type specifies content format
+    // Per draft-03: content_media_type specifies content format
     // Default: text/plain (plain text, no HTML)
     // Sites can filter to change to text/markdown if needed
     $content_media_type = apply_filters('tct_content_media_type', 'text/plain; charset=utf-8', $post);
@@ -397,8 +395,8 @@ function tct_build_full_payload($post, $c_url, $m_url, $hash) {
         'post_id' => $post ? intval($post->ID) : null,
         'post_type' => $post ? $post->post_type : null,
         'title' => $title,
-        'content_media_type' => $content_media_type,  // Per draft-02: NEW REQUIRED FIELD
-        'modified' => $modified,
+        'content_media_type' => $content_media_type,  // Per draft-03: NEW REQUIRED FIELD
+        'lastModified' => $modified,
         'published' => $published,
         'word_count' => $wc,
         'slug' => $slug,
@@ -412,7 +410,7 @@ function tct_build_full_payload($post, $c_url, $m_url, $hash) {
         'content' => $content_text,
     ];
 
-    // NOTE: Per draft-02, 'hash' field is REMOVED from JSON payload
+    // NOTE: Per draft-03, 'hash' field is REMOVED from JSON payload
     // The ETag header is now the sole validator (no redundant hash in body)
     // Kept $hash parameter for backwards compatibility but don't include in payload
     // Allow site owners to force full content regardless of third-party filters

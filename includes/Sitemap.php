@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 if (!defined('ABSPATH')) { exit; }
 
 function tct_output_sitemap() {
@@ -110,7 +110,7 @@ function tct_output_sitemap() {
             $entries[] = [
                 'cUrl' => $home_url,
                 'mUrl' => $home_m_url,
-                'modified' => $modified,
+                'lastModified' => $modified,
                 'etag' => $etag,
             ];
         }
@@ -125,14 +125,14 @@ function tct_output_sitemap() {
             $entries[] = [
                 'cUrl' => $home_url,
                 'mUrl' => $home_m_url,
-                'modified' => $modified,
+                'lastModified' => $modified,
                 'etag' => $etag,
             ];
         }
     }
 
     // PHASE 2.2: Read ETags from post meta (NOT regenerate)
-    // This turns O(N × expensive) into O(N × cheap meta lookup)
+    // This turns O(N Ã— expensive) into O(N Ã— cheap meta lookup)
     foreach ((array)$ids as $pid) {
         $c_url = get_permalink($pid);
         if (!$c_url) { continue; }
@@ -155,24 +155,19 @@ function tct_output_sitemap() {
         $entries[] = [
             'cUrl' => trailingslashit($c_url),
             'mUrl' => trailingslashit($m_url),
-            'modified' => get_post_modified_time('c', true, $pid),
+            'lastModified' => get_post_modified_time('c', true, $pid),
             'etag' => $etag,
         ];
     }
-    // Per draft-02: version 2 for updated spec
+    // Per draft-03: version 2 for updated spec
     $out = [
         'version' => 2,
         'profile' => 'tct-1',
         'items' => $entries,
     ];
 
-    // Generate JSON with error handling
-    $json = wp_json_encode($out, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-
-    if ($json === false) {
-        status_header(500);
-        return;
-    }
+    // Generate deterministic JSON bytes for the sitemap response.
+    $json = tct_canonical_json_encode($out);
 
     // PHASE 2.4: Compute strong ETag from final JSON bytes
     $etag = 'sha256-' . hash('sha256', $json);
