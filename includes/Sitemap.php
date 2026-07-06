@@ -72,6 +72,11 @@ function tct_output_sitemap() {
         $shop_id = (int) wc_get_page_id('shop');
         if ($shop_id > 0) { $post_not_in[] = $shop_id; }
     }
+    $posts_page_id = (int) get_option('page_for_posts');
+    if ($posts_page_id > 0) {
+        // The posts page behaves as an archive, not as a singular content M-URL.
+        $post_not_in[] = $posts_page_id;
+    }
 
     // PHASE 2.3: Optimize query with performance flags
     $qargs = [

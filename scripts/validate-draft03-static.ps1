@@ -32,6 +32,7 @@ Add-Check 'endpoint_content_digest' ($endpoint -match 'Content-Digest: sha-256='
 Add-Check 'endpoint_no_body_hash_field' ($endpoint -notmatch "'hash'\s*=>")
 Add-Check 'sitemap_lastModified' ($sitemap -match "'lastModified'" -and $sitemap -notmatch "'modified'\s*=>")
 Add-Check 'sitemap_canonical_json' ($sitemap -match '\$json = tct_canonical_json_encode\(\$out\);')
+Add-Check 'sitemap_excludes_posts_page_archive' ($sitemap -match "get_option\('page_for_posts'\)" -and $sitemap -match '\$post_not_in\[\] = \$posts_page_id;')
 Add-Check 'stats_writes_opt_in' ($stats -match "get_option\('tct_stats_enabled', 0\)")
 Add-Check 'changes_writes_opt_in' ($changes -match "get_option\('tct_changes_enabled', 0\)")
 Add-Check 'receipt_contract_sanitized' ($receipt -match 'function tct_receipt_contract_id' -and $receipt -match '\^\[A-Za-z0-9\._:-\]\{1,128\}\$')
