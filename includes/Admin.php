@@ -112,20 +112,20 @@ function tct_render_settings_page() {
 
       <h2>TCT Endpoints Status</h2>
       <div style="background:#e7f3ff;border-left:4px solid #2271b1;padding:12px;margin-bottom:16px;">
-        <strong>✓ TCT is active for all post types</strong><br>
+        <strong>OK TCT is active for all post types</strong><br>
         <small>JSON endpoints are automatically created for all posts, pages, and custom post types. The sitemap includes all published content. No configuration needed!</small>
       </div>
 
       <h2>llms.txt Configuration (settings)</h2>
       <?php if ($exists): ?>
         <div style="background:#fff3cd;border-left:4px solid #ffc107;padding:12px;margin-bottom:16px;">
-          <strong>⚠️ Static file detected:</strong> <code><?php echo esc_html($path); ?></code><br>
+          <strong>Warning Static file detected:</strong> <code><?php echo esc_html($path); ?></code><br>
           <small>Last modified: <?php echo $mod ? esc_html(date('Y-m-d H:i', $mod)) : 'Unknown'; ?> | Owner: <?php echo $owned ? '<span style="color:green">TCT</span>' : '<span style="color:#a00">Other/Unknown</span>'; ?></small><br>
           <small><strong>Note:</strong> Static files are served by your web server and may show outdated content. Virtual mode always stays current.</small>
         </div>
       <?php else: ?>
         <div style="background:#d4edda;border-left:4px solid #28a745;padding:12px;margin-bottom:16px;">
-          <strong>✓ Using virtual endpoint</strong> - Your /llms.txt is always up-to-date automatically.
+          <strong>OK Using virtual endpoint</strong> - Your /llms.txt is always up-to-date automatically.
         </div>
       <?php endif; ?>
 
@@ -156,9 +156,9 @@ function tct_render_settings_page() {
               <label><input type="checkbox" name="tct_llms_include_policies" <?php checked($include_policies); ?>> Include policy links</label><br>
               <small style="color:#666;margin-left:20px;display:block;margin-bottom:8px;">
                 <strong>What this does:</strong> Adds policy URLs to three places:<br>
-                • <strong>llms.txt</strong> - Human-readable section<br>
-                • <strong>HTTP Link headers</strong> - AI crawlers see <code>rel="terms-of-service"</code> and <code>rel="payment"</code><br>
-                • <strong>Policy JSON</strong> - Structured data at /llm-policy.json<br>
+                - <strong>llms.txt</strong> - Human-readable section<br>
+                - <strong>HTTP Link headers</strong> - AI crawlers see <code>rel="terms-of-service"</code> and <code>rel="payment"</code><br>
+                - <strong>Policy JSON</strong> - Structured data at /llm-policy.json<br>
                 <em>Use this to inform AI systems about your usage policies and pricing.</em>
               </small>
               Terms/Policy URL: <input type="url" name="tct_terms_url" value="<?php echo esc_attr($terms); ?>" size="50" placeholder="https://example.com/ai-policy/"><br>
@@ -173,9 +173,9 @@ function tct_render_settings_page() {
               <label><input type="checkbox" name="tct_receipts_enabled" <?php checked($receipts_enabled); ?>> Emit AI-Usage-Receipt on 200/304</label><br>
               <small style="color:#666;margin-left:20px;display:block;margin-bottom:8px;">
                 <strong>What this does:</strong> Sends cryptographically signed receipts in HTTP headers.<br>
-                • AI crawlers send <code>X-AI-Contract: THEIR-ID</code> with requests<br>
-                • Your site responds with <code>AI-Usage-Receipt</code> header containing: contract ID, status code, bytes served, ETag, timestamp, and signature<br>
-                • Creates audit trail of what was accessed and when<br>
+                - AI crawlers send <code>X-AI-Contract: THEIR-ID</code> with requests<br>
+                - Your site responds with <code>AI-Usage-Receipt</code> header containing: contract ID, status code, bytes served, ETag, timestamp, and signature<br>
+                - Creates audit trail of what was accessed and when<br>
                 <strong>When to use:</strong> For formal agreements with AI companies, billing, or tracking specific crawlers.<br>
                 <strong>Most sites:</strong> Leave this disabled unless you have commercial agreements requiring usage tracking.<br>
                 <em>Not included in llms.txt - HTTP headers only.</em>
@@ -212,7 +212,7 @@ function tct_render_settings_page() {
           </form>
 
         <?php elseif ($exists && !$owned): ?>
-          <p style="color:#d63638;"><strong>⚠️ Warning:</strong> Static file exists but not managed by TCT</p>
+          <p style="color:#d63638;"><strong>Warning Warning:</strong> Static file exists but not managed by TCT</p>
           <form method="post" style="display:inline-block">
             <?php wp_nonce_field('tct_settings'); ?>
             <input type="hidden" name="tct_action" value="overwrite">
@@ -329,7 +329,7 @@ function tct_create_showcase_pages() {
 
     // 1) Partner Hub
     $hub = '';
-    $hub .= "# Trusted Collaboration Tunnel (TCT) — Partner Hub\n\n";
+    $hub .= "# Trusted Collaboration Tunnel (TCT) - Partner Hub\n\n";
     $hub .= "- Domain: https://{$domain}\n";
     $hub .= "- LLM Sitemap: {$sitemap}\n";
     $hub .= "- llms.txt: {$llms}\n";
@@ -337,10 +337,10 @@ function tct_create_showcase_pages() {
     $hub .= "- Change Feed: " . home_url('/llm-changes.json') . "\n\n";
     $hub .= "## Validate Now\n";
     $hub .= "Use the validator to check canonical, ETag parity, 304 precedence, and JSON hygiene.\n\n";
-    $hub .= "[llm_validator title=\"Validate Our Endpoints\" description=\"Validate canonical↔machine pairs or the sitemap.\" show_sitemap_tab=\"true\" default_sitemap=\"{$sitemap}\"]\n\n";
+    $hub .= "[llm_validator title=\"Validate Our Endpoints\" description=\"Validate canonical<->machine pairs or the sitemap.\" show_sitemap_tab=\"true\" default_sitemap=\"{$sitemap}\"]\n\n";
     $hub .= "## Sample Endpoints\n";
-    $hub .= "- Example: https://{$domain}/ai-policy/ → https://{$domain}/ai-policy/llm/\n";
-    $hub .= "- Example: https://{$domain}/ai-pricing/ → https://{$domain}/ai-pricing/llm/\n\n";
+    $hub .= "- Example: https://{$domain}/ai-policy/ -> https://{$domain}/ai-policy/llm/\n";
+    $hub .= "- Example: https://{$domain}/ai-pricing/ -> https://{$domain}/ai-pricing/llm/\n\n";
     $hub .= "## Method Overview\n";
     $hub .= "1) Sitemap-first discovery\n2) Deterministic JSON (1:1 content)\n3) ETag parity + 304 discipline\n4) Optional receipts (HMAC)\n\n";
 
@@ -353,15 +353,15 @@ function tct_create_showcase_pages() {
     $crawlers .= "# For AI Crawlers\n\n";
     $crawlers .= "- Use `{$sitemap}` for discovery.\n- Per-article JSON: `{canonical}/llm/`.\n- Headers: Link rel=canonical; ETag; Cache-Control; Vary.\n- Conditional GET: send If-None-Match (quoted ETag) for 304.\n\n";
     $crawlers .= "### Quick Checks\n";
-    $crawlers .= "- `curl -sI https://{$domain}/ai-policy/llm/`\n- `curl -s -o /dev/null -w '%{http_code}\\n' -H 'If-None-Match: \"sha256-…\"' https://{$domain}/ai-policy/llm/`\n\n";
+    $crawlers .= "- `curl -sI https://{$domain}/ai-policy/llm/`\n- `curl -s -o /dev/null -w '%{http_code}\\n' -H 'If-None-Match: \"sha256-...\"' https://{$domain}/ai-policy/llm/`\n\n";
     $mk('For AI Crawlers', 'for-ai-crawlers', $crawlers);
 
     // 3) Developer Docs
     $dev = '';
     $dev .= "# Developer Notes\n\n";
-    $dev .= "JSON shape includes: title, modified, published, hash, word_count, slug, excerpt, author, image, images[], headings[], categories[], tags[], content.text.\n\n";
-    $dev .= "Headers: Link rel=canonical; ETag(sha256-…); Cache-Control: private, max-age=0, must-revalidate; Vary: Accept.\n\n";
-    $dev .= "Receipts (optional): `AI-Usage-Receipt: contract=…; status=…; bytes=…; etag=\"…\"; ts=…; sig=…` (HMAC-SHA256).\n\n";
+    $dev .= "JSON shape includes: title, lastModified, published, word_count, slug, excerpt, author, image, images[], headings[], categories[], tags[], content.\n\n";
+    $dev .= "Headers: Link rel=canonical; ETag(sha256-...); Cache-Control: private, max-age=0, must-revalidate; Vary: Accept.\n\n";
+    $dev .= "Receipts (optional): `AI-Usage-Receipt: contract=...; status=...; bytes=...; etag=\"...\"; ts=...; sig=...` (HMAC-SHA256).\n\n";
     $mk('Developer Docs', 'developers', $dev);
 
     // 4) For Publishers
@@ -375,11 +375,11 @@ function tct_create_showcase_pages() {
     $pub .= "- You pay egress costs for every byte\n\n";
     $pub .= "**TCT solves this** by giving AI crawlers a more efficient way to access your content:\n\n";
     $pub .= "### Benefits\n\n";
-    $pub .= "✓ **Reduce bandwidth costs by 60-90%** - JSON is 67% smaller than HTML, and unchanged content is skipped entirely\n\n";
-    $pub .= "✓ **Lower server load** - 90%+ of requests result in zero origin hits (sitemap pre-check)\n\n";
-    $pub .= "✓ **Better AI visibility** - Crawlers prefer efficient sources, improving your content's discoverability\n\n";
-    $pub .= "✓ **No SEO impact** - Your human visitors see the exact same HTML; only AI endpoints change\n\n";
-    $pub .= "✓ **Usage transparency** - Optional receipts let you track exactly how AI systems use your content\n\n";
+    $pub .= "OK **Reduce bandwidth costs by 60-90%** - JSON is 67% smaller than HTML, and unchanged content is skipped entirely\n\n";
+    $pub .= "OK **Lower server load** - 90%+ of requests result in zero origin hits (sitemap pre-check)\n\n";
+    $pub .= "OK **Better AI visibility** - Crawlers prefer efficient sources, improving your content's discoverability\n\n";
+    $pub .= "OK **No SEO impact** - Your human visitors see the exact same HTML; only AI endpoints change\n\n";
+    $pub .= "OK **Usage transparency** - Optional receipts let you track exactly how AI systems use your content\n\n";
     $pub .= "### Real-World Savings\n\n";
     $pub .= "For a typical blog with **20,000 AI crawler requests/month**:\n\n";
     $pub .= "- **Before TCT:** ~5 GB egress/month\n";
@@ -398,7 +398,7 @@ function tct_create_showcase_pages() {
     $pub .= "- **Access control** - Paywalled/members-only content remains protected\n\n";
     $pub .= "### Get Started\n\n";
     $pub .= "1. Plugin is already active (you're reading this page!)\n";
-    $pub .= "2. Configure settings at: WordPress Admin → Settings → TCT\n";
+    $pub .= "2. Configure settings at: WordPress Admin -> Settings -> TCT\n";
     $pub .= "3. Test your endpoints: {$sitemap}\n";
     $pub .= "4. Share with AI crawler partners or submit to search engines\n\n";
     $mk('For Publishers', 'for-publishers', $pub);
@@ -413,9 +413,9 @@ function tct_create_showcase_pages() {
     $guide .= "# Should return: HTTP/1.1 200 OK\n";
     $guide .= "```\n\n";
     $guide .= "## Step 2: Configure Settings\n\n";
-    $guide .= "Go to **WordPress Admin → Settings → TCT**:\n\n";
-    $guide .= "- ✓ Enable virtual /llms.txt\n";
-    $guide .= "- ✓ Include sample endpoints\n";
+    $guide .= "Go to **WordPress Admin -> Settings -> TCT**:\n\n";
+    $guide .= "- OK Enable virtual /llms.txt\n";
+    $guide .= "- OK Include sample endpoints\n";
     $guide .= "- Set post types (default: `post,page`)\n";
     $guide .= "- Add policy URLs (terms/pricing) - optional\n";
     $guide .= "- Enable usage receipts - optional\n\n";
@@ -428,11 +428,11 @@ function tct_create_showcase_pages() {
     $guide .= "You should see JSON output with `title`, `content`, `author`, etc.\n\n";
     $guide .= "## Step 4: Validate Compliance\n\n";
     $guide .= "Use the validator on the Partners page to check:\n\n";
-    $guide .= "- Canonical ↔ Machine handshake\n";
+    $guide .= "- Canonical <-> Machine handshake\n";
     $guide .= "- ETag generation and parity\n";
     $guide .= "- 304 Not Modified discipline\n";
     $guide .= "- Content-Type headers\n\n";
-    $guide .= "→ [Go to Validator](/partners)\n\n";
+    $guide .= "-> [Go to Validator](/partners)\n\n";
     $guide .= "## Step 5: Optional - Cloudflare Worker\n\n";
     $guide .= "If you use Cloudflare, deploy the TCT Worker for additional features:\n\n";
     $guide .= "- Edge-layer authentication\n";
@@ -453,7 +453,7 @@ function tct_create_showcase_pages() {
     $guide .= "Include your sitemap URL: `{$sitemap}`\n\n";
     $guide .= "## Troubleshooting\n\n";
     $guide .= "**Q: Endpoints return 404**\n";
-    $guide .= "A: Go to Settings → Permalinks and click \"Save Changes\" to flush rewrite rules.\n\n";
+    $guide .= "A: Go to Settings -> Permalinks and click \"Save Changes\" to flush rewrite rules.\n\n";
     $guide .= "**Q: ETag keeps changing even when content hasn't**\n";
     $guide .= "A: Check for dynamic elements (date/time, random content) in your theme template.\n\n";
     $guide .= "**Q: Validator shows ETag mismatch**\n";
@@ -483,11 +483,11 @@ function tct_create_showcase_pages() {
     $faq .= "Yes. TCT is compatible with WP Super Cache, W3 Total Cache, LiteSpeed Cache, and other caching plugins. The JSON endpoints are cacheable by default.\n\n";
     $faq .= "## Security & Privacy\n\n";
     $faq .= "### Can I restrict who accesses the endpoints?\n\n";
-    $faq .= "Yes. Enable API key authentication in Settings → TCT. Only clients with valid keys can access JSON endpoints.\n\n";
+    $faq .= "Yes. Enable API key authentication in Settings -> TCT. Only clients with valid keys can access JSON endpoints.\n\n";
     $faq .= "### What about paywalled content?\n\n";
     $faq .= "TCT respects your existing access controls. If a post requires authentication to view, the JSON endpoint returns 401 Unauthorized.\n\n";
     $faq .= "### Can I see who's accessing my content?\n\n";
-    $faq .= "Yes. Enable usage receipts in Settings → TCT. Crawlers that support receipts will send a contract ID, and you'll get signed records of each access.\n\n";
+    $faq .= "Yes. Enable usage receipts in Settings -> TCT. Crawlers that support receipts will send a contract ID, and you'll get signed records of each access.\n\n";
     $faq .= "### Is this GDPR compliant?\n\n";
     $faq .= "Yes. TCT only serves publicly available content (same as your HTML pages). It doesn't collect personal data, set cookies, or track users.\n\n";
     $faq .= "## Costs & Performance\n\n";
