@@ -72,6 +72,17 @@ Add-Check 'murl_response_metadata' (
     $endpoint -match 'no-transform'
 )
 Add-Check 'murl_conditional_request_parser' ($endpoint -match 'ConditionalRequest::ifNoneMatchMatches')
+Add-Check 'wordpress_if_none_match_unslashed' (
+    $endpoint -match 'tct_if_none_match_request_value' -and
+    $endpoint -match 'wp_unslash' -and
+    $sitemap -match 'tct_if_none_match_request_value'
+)
+Add-Check 'plain_permalink_murl_route' (
+    $hashing -match "add_query_arg\('tct_m_url'" -and
+    $endpoint -match "get_query_var\('tct_m_url'\)" -and
+    $main -match "update_option_permalink_structure" -and
+    $main -match "\[\]\s*=\s*'tct_m_url'"
+)
 Add-Check 'sitemap_certified_profile_v2' (
     $sitemap -match 'MSitemapDocument::fromArray' -and
     $sitemap -match 'M_SITEMAP_VERSION' -and

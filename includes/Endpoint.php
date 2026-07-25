@@ -20,6 +20,15 @@ function tct_handle_requests() {
         PHP_URL_PATH
     );
 
+    // Plain WordPress permalinks use query-style C-URLs. Their M-URLs retain
+    // that query and add the dedicated public routing flag.
+    if (get_query_var('tct_m_url')) {
+        $post_id = (int) get_queried_object_id();
+        $post = $post_id > 0 ? get_post($post_id) : null;
+        tct_output_llm_endpoint('', $post);
+        exit;
+    }
+
     // If rewrite captured root /{endpoint}/, serve it now
     if (get_query_var('tct_llm_root')) {
         tct_output_llm_endpoint('/');
@@ -102,7 +111,19 @@ function tct_handle_requests() {
     }
 }
 
-function tct_output_llm_endpoint($canonical_path) {
+/**
+ * Recover the original If-None-Match field value after WordPress applies
+ * legacy magic quotes to request globals during bootstrap.
+ */
+function tct_if_none_match_request_value() {
+    if (!isset($_SERVER['HTTP_IF_NONE_MATCH'])) {
+        return '';
+    }
+
+    return (string) wp_unslash((string) $_SERVER['HTTP_IF_NONE_MATCH']);
+}
+
+function tct_output_llm_endpoint($canonical_path, $resolved_post = null) {
     $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
     if (!\TCT\Draft03\ConditionalRequest::isSafeReadMethod($method)) {
         status_header(405);
@@ -116,15 +137,17 @@ function tct_output_llm_endpoint($canonical_path) {
         exit;
     }
 
-    $requested_c_url = home_url($canonical_path);
-    $post = null;
-    $post_id = url_to_postid($requested_c_url);
+    $post = $resolved_post;
+    if (func_num_args() < 2) {
+        $requested_c_url = home_url($canonical_path);
+        $post_id = url_to_postid($requested_c_url);
 
-    if ($post_id) {
-        $post = get_post($post_id);
-    } elseif (untrailingslashit($requested_c_url) === untrailingslashit(home_url('/'))) {
-        $front_id = (int) get_option('page_on_front');
-        $post = $front_id ? get_post($front_id) : tct_create_homepage_pseudo_post();
+        if ($post_id) {
+            $post = get_post($post_id);
+        } elseif (untrailingslashit($requested_c_url) === untrailingslashit(home_url('/'))) {
+            $front_id = (int) get_option('page_on_front');
+            $post = $front_id ? get_post($front_id) : tct_create_homepage_pseudo_post();
+        }
     }
 
     if (!$post || !tct_post_is_exposable($post)) {
@@ -165,9 +188,7 @@ function tct_output_llm_endpoint($canonical_path) {
         $GLOBALS['wp_query']->is_404 = false;
     }
 
-    $if_none_match = isset($_SERVER['HTTP_IF_NONE_MATCH'])
-        ? (string) $_SERVER['HTTP_IF_NONE_MATCH']
-        : '';
+    $if_none_match = tct_if_none_match_request_value();
     if (
         $if_none_match !== ''
         && \TCT\Draft03\ConditionalRequest::ifNoneMatchMatches($if_none_match, $identity->etag)

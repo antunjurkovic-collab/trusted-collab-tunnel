@@ -19,6 +19,28 @@ namespace {
             return $GLOBALS['tct_test_options'][$name] ?? $default;
         }
     }
+    if (!function_exists('sanitize_title')) {
+        function sanitize_title(string $value): string
+        {
+            return strtolower(trim($value));
+        }
+    }
+    if (!function_exists('trailingslashit')) {
+        function trailingslashit(string $value): string
+        {
+            return rtrim($value, '/') . '/';
+        }
+    }
+    if (!function_exists('add_query_arg')) {
+        function add_query_arg(string $key, string $value, string $url): string
+        {
+            return $url
+                . (str_contains($url, '?') ? '&' : '?')
+                . rawurlencode($key)
+                . '='
+                . rawurlencode($value);
+        }
+    }
     if (!function_exists('parse_blocks')) {
         function parse_blocks(string $source): array
         {
@@ -33,6 +55,12 @@ namespace {
             return $remove_breaks
                 ? (string) preg_replace('/[\r\n\t ]+/', ' ', $value)
                 : $value;
+        }
+    }
+    if (!function_exists('wp_unslash')) {
+        function wp_unslash(string $value): string
+        {
+            return stripslashes($value);
         }
     }
     if (!function_exists('get_the_title')) {
@@ -188,6 +216,32 @@ namespace TCT\Tests\WordPress {
                 $this->post(),
                 'https://example.com/post/',
                 'https://example.com/post/llm/'
+            );
+        }
+
+        public function testWordPressMagicQuotesAreRemovedFromIfNoneMatch(): void
+        {
+            $_SERVER['HTTP_IF_NONE_MATCH'] = '\\"sha256-current\\"';
+
+            try {
+                self::assertSame(
+                    '"sha256-current"',
+                    \tct_if_none_match_request_value()
+                );
+            } finally {
+                unset($_SERVER['HTTP_IF_NONE_MATCH']);
+            }
+        }
+
+        public function testMurlMappingSupportsPrettyAndPlainPermalinks(): void
+        {
+            self::assertSame(
+                'https://example.com/article/llm/',
+                \tct_m_url_for_c_url('https://example.com/article/')
+            );
+            self::assertSame(
+                'https://example.com/?p=7&tct_m_url=1',
+                \tct_m_url_for_c_url('https://example.com/?p=7')
             );
         }
 

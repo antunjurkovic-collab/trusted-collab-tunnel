@@ -23,6 +23,10 @@ function tct_m_url_for_c_url($c_url) {
         $endpoint = 'llm';
     }
 
+    if (parse_url((string) $c_url, PHP_URL_QUERY) !== null) {
+        return add_query_arg('tct_m_url', '1', (string) $c_url);
+    }
+
     return trailingslashit((string) $c_url) . $endpoint . '/';
 }
 

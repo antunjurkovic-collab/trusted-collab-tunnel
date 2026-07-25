@@ -141,6 +141,7 @@ add_action('update_option_blogname', 'tct_invalidate_protocol_generation');
 add_action('update_option_blogdescription', 'tct_invalidate_protocol_generation');
 add_action('update_option_page_on_front', 'tct_invalidate_protocol_generation');
 add_action('update_option_page_for_posts', 'tct_invalidate_protocol_generation');
+add_action('update_option_permalink_structure', 'tct_invalidate_protocol_generation');
 add_action('update_option_tct_endpoint_slug', 'tct_invalidate_protocol_generation');
 add_action('update_option_tct_sitemap_path', 'tct_invalidate_protocol_generation');
 add_action('update_option_tct_include_headings', 'tct_invalidate_protocol_generation');
@@ -349,5 +350,6 @@ add_filter('query_vars', function($vars) {
     if (is_array($vars)) { $vars[] = 'tct_policy'; }
     if (is_array($vars)) { $vars[] = 'tct_stats'; }
     if (is_array($vars)) { $vars[] = 'tct_changes'; }
+    if (is_array($vars)) { $vars[] = 'tct_m_url'; }
     return $vars;
 });

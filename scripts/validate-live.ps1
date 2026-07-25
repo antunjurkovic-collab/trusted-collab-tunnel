@@ -12,6 +12,12 @@ $BaseUrl = $BaseUrl.TrimEnd('/')
 $checks = New-Object System.Collections.Generic.List[object]
 $mUrlProfile = 'https://www.ietf.org/archive/id/draft-jurkovikj-collab-tunnel-03.html#tct-m-url-profile'
 $sitemapProfile = 'https://www.ietf.org/archive/id/draft-jurkovikj-collab-tunnel-03.html#tct-m-sitemap-profile'
+$utf8 = [Text.UTF8Encoding]::new($false, $true)
+Add-Type -AssemblyName System.Net.Http
+$httpHandler = [Net.Http.HttpClientHandler]::new()
+$httpHandler.AutomaticDecompression = [Net.DecompressionMethods]::None
+$httpClient = [Net.Http.HttpClient]::new($httpHandler)
+$httpClient.Timeout = [TimeSpan]::FromSeconds(30)
 
 function Add-Check {
     param([string]$Name, [bool]$Ok, [string]$Detail = '')
@@ -38,40 +44,60 @@ function Invoke-TctRequest {
         $headers[$entry.Key] = $entry.Value
     }
 
+    $request = [Net.Http.HttpRequestMessage]::new(
+        [Net.Http.HttpMethod]::new($Method),
+        $Url
+    )
     try {
-        $response = Invoke-WebRequest -UseBasicParsing -Uri $Url -Method $Method `
-            -Headers $headers -TimeoutSec 30 -ErrorAction Stop
-        return [pscustomobject]@{
-            status = [int]$response.StatusCode
-            headers = $response.Headers
-            body = [string]$response.Content
+        foreach ($entry in $headers.GetEnumerator()) {
+            if (-not $request.Headers.TryAddWithoutValidation($entry.Key, $entry.Value)) {
+                throw "Unable to add request header $($entry.Key)."
+            }
         }
-    } catch {
-        $response = $_.Exception.Response
-        if (-not $response) { throw }
-        $body = ''
-        if ($response.GetResponseStream()) {
-            $reader = New-Object IO.StreamReader($response.GetResponseStream())
-            $body = $reader.ReadToEnd()
+
+        $response = $script:httpClient.SendAsync(
+            $request,
+            [Net.Http.HttpCompletionOption]::ResponseHeadersRead
+        ).GetAwaiter().GetResult()
+        try {
+            [byte[]]$bodyBytes = $response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult()
+            $responseHeaders = @{}
+            foreach ($entry in $response.Headers) {
+                $responseHeaders[$entry.Key] = [string]::Join(',', @($entry.Value))
+            }
+            foreach ($entry in $response.Content.Headers) {
+                $responseHeaders[$entry.Key] = [string]::Join(',', @($entry.Value))
+            }
+
+            $body = ''
+            if ($bodyBytes.Length -gt 0) {
+                $body = $script:utf8.GetString($bodyBytes)
+            }
+
+            return [pscustomobject]@{
+                status = [int]$response.StatusCode
+                headers = $responseHeaders
+                body = $body
+                bodyBytes = $bodyBytes
+            }
+        } finally {
+            $response.Dispose()
         }
-        return [pscustomobject]@{
-            status = [int]$response.StatusCode
-            headers = $response.Headers
-            body = $body
-        }
+    } finally {
+        $request.Dispose()
     }
 }
 
 function Get-IdentityMetadata {
-    param([string]$Body)
-    $bytes = [Text.Encoding]::UTF8.GetBytes($Body)
+    param([byte[]]$Bytes)
+
     $sha = [Security.Cryptography.SHA256]::Create()
-    try { $digest = $sha.ComputeHash($bytes) } finally { $sha.Dispose() }
+    try { $digest = $sha.ComputeHash($Bytes) } finally { $sha.Dispose() }
     $hex = -join ($digest | ForEach-Object { $_.ToString('x2') })
     return [pscustomobject]@{
         etag = "`"sha256-$hex`""
         contentDigest = 'sha-256=:' + [Convert]::ToBase64String($digest) + ':'
-        bytes = $bytes.Length
+        bytes = $Bytes.Length
     }
 }
 
@@ -87,7 +113,7 @@ function Test-IdentityResponse {
     $etag = Header-Value $Response.headers 'ETag'
     $digest = Header-Value $Response.headers 'Content-Digest'
     $link = Header-Value $Response.headers 'Link'
-    $metadata = Get-IdentityMetadata $Response.body
+    $metadata = Get-IdentityMetadata $Response.bodyBytes
     $json = $null
     try { $json = $Response.body | ConvertFrom-Json } catch {}
 
@@ -198,4 +224,6 @@ foreach ($check in $checks) {
     failed_names = @($failed | ForEach-Object { $_.name })
 } | ConvertTo-Json -Depth 5
 
+$httpClient.Dispose()
+$httpHandler.Dispose()
 if ($failed.Count -gt 0) { exit 1 }

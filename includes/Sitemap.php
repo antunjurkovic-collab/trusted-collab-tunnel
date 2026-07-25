@@ -39,9 +39,7 @@ function tct_output_sitemap() {
         }
     }
 
-    $if_none_match = isset($_SERVER['HTTP_IF_NONE_MATCH'])
-        ? (string) $_SERVER['HTTP_IF_NONE_MATCH']
-        : '';
+    $if_none_match = tct_if_none_match_request_value();
     if (
         $if_none_match !== ''
         && \TCT\Draft03\ConditionalRequest::ifNoneMatchMatches($if_none_match, $identity->etag)
