@@ -12,7 +12,9 @@ Thumbs.db
 
 # Composer
 /vendor/
-composer.lock
+
+# PHPUnit
+/.phpunit.cache/
 
 # Node modules (if using build tools later)
 node_modules/
