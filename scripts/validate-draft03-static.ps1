@@ -37,11 +37,13 @@ Add-Check 'exact_murl_profile' ($protocol.Contains($mUrlProfile))
 Add-Check 'exact_sitemap_profile' ($protocol.Contains($sitemapProfile))
 Add-Check 'root_index_has_no_obsolete_profile_attribute' (
     $main -match 'rel="index"; type="application/json"' -and
-    $main -notmatch 'rel="index"; type="application/json"; profile='
+    $main -notmatch 'rel="index"; type="application/json"; profile=' -and
+    $main -match "add_action\('template_redirect', 'tct_add_root_link_header', -1\)"
 )
 Add-Check 'c_url_http_alternate_link' (
     $headLinks -match 'tct_add_c_url_alternate_header' -and
-    $headLinks -match 'rel="alternate"; type="application/json"'
+    $headLinks -match 'rel="alternate"; type="application/json"' -and
+    $headLinks -match "add_action\('template_redirect', 'tct_add_c_url_alternate_header', -1\)"
 )
 Add-Check 'murl_bidirectional_links' (
     $endpoint -match 'rel="canonical"' -and
@@ -82,6 +84,10 @@ Add-Check 'plain_permalink_murl_route' (
     $endpoint -match "get_query_var\('tct_m_url'\)" -and
     $main -match "update_option_permalink_structure" -and
     $main -match "\[\]\s*=\s*'tct_m_url'"
+)
+Add-Check 'protocol_diagnostics_not_displayed' (
+    $main -match 'tct_is_protocol_response_request' -and
+    $main -match "ini_set\('display_errors', '0'\)"
 )
 Add-Check 'sitemap_certified_profile_v2' (
     $sitemap -match 'MSitemapDocument::fromArray' -and

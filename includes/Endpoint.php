@@ -22,7 +22,7 @@ function tct_handle_requests() {
 
     // Plain WordPress permalinks use query-style C-URLs. Their M-URLs retain
     // that query and add the dedicated public routing flag.
-    if (get_query_var('tct_m_url')) {
+    if ((string) get_query_var('tct_m_url') === '1') {
         $post_id = (int) get_queried_object_id();
         $post = $post_id > 0 ? get_post($post_id) : null;
         tct_output_llm_endpoint('', $post);

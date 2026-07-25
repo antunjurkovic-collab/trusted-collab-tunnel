@@ -43,6 +43,10 @@ function tct_output_html_alternate_link() {
  * C-URL to M-URL discovery is preferably exposed in the HTTP Link field.
  */
 function tct_add_c_url_alternate_header() {
+    if (tct_is_protocol_response_request()) {
+        return;
+    }
+
     $post = tct_current_c_url_post();
     if (!$post) {
         return;
@@ -58,4 +62,4 @@ function tct_add_c_url_alternate_header() {
         false
     );
 }
-add_action('send_headers', 'tct_add_c_url_alternate_header');
+add_action('template_redirect', 'tct_add_c_url_alternate_header', -1);

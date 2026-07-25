@@ -113,6 +113,7 @@ function Test-IdentityResponse {
     $etag = Header-Value $Response.headers 'ETag'
     $digest = Header-Value $Response.headers 'Content-Digest'
     $link = Header-Value $Response.headers 'Link'
+    $contentEncoding = Header-Value $Response.headers 'Content-Encoding'
     $metadata = Get-IdentityMetadata $Response.bodyBytes
     $json = $null
     try { $json = $Response.body | ConvertFrom-Json } catch {}
@@ -128,6 +129,7 @@ function Test-IdentityResponse {
     Add-Check "$Prefix content_length" (
         (Header-Value $Response.headers 'Content-Length') -eq [string]$metadata.bytes
     )
+    Add-Check "$Prefix identity_not_content_encoded" ($contentEncoding -eq '') $contentEncoding
     Add-Check "$Prefix profile_link" ($link -match [regex]::Escape($RequiredProfileLink)) $link
     Add-Check "$Prefix varies_accept_encoding" (
         (Header-Value $Response.headers 'Vary') -match '(?i)(^|,\s*)Accept-Encoding($|,)'
@@ -173,6 +175,20 @@ Add-Check 'sitemap_304_current_etag' (
     (Header-Value $sitemapConditional.headers 'ETag') -eq $sitemapResult.etag
 )
 
+$sitemapCompressionProbe = Invoke-TctRequest $sitemapUrl 'GET' @{
+    'Accept-Encoding' = 'gzip'
+    'Cache-Control' = 'no-cache'
+}
+$sitemapCompressionResult = Test-IdentityResponse `
+    'sitemap:gzip-advertised' `
+    $sitemapCompressionProbe `
+    $sitemapProfile `
+    $sitemapProfile
+Add-Check 'sitemap_gzip_advertisement_same_identity_etag' (
+    $sitemapCompressionResult.etag -eq $sitemapResult.etag
+)
+
+$compressionMurlChecked = $false
 foreach ($item in @($items | Select-Object -First $SampleMurls)) {
     $mUrl = [string]$item.mUrl
     $prefix = "murl:$mUrl"
@@ -195,6 +211,22 @@ foreach ($item in @($items | Select-Object -First $SampleMurls)) {
     Add-Check "$prefix head_same_etag" (
         (Header-Value $head.headers 'ETag') -eq $result.etag
     )
+
+    if (-not $compressionMurlChecked) {
+        $compressionResponse = Invoke-TctRequest $mUrl 'GET' @{
+            'Accept-Encoding' = 'gzip'
+            'Cache-Control' = 'no-cache'
+        }
+        $compressionResult = Test-IdentityResponse `
+            "$prefix`:gzip-advertised" `
+            $compressionResponse `
+            $mUrlProfile `
+            $mUrlProfile
+        Add-Check "$prefix gzip_advertisement_same_identity_etag" (
+            $compressionResult.etag -eq $result.etag
+        )
+        $compressionMurlChecked = $true
+    }
 }
 
 $methodProbe = Invoke-TctRequest $sitemapUrl 'POST'

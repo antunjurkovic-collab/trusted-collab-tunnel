@@ -56,6 +56,12 @@ require_once TCT_PLUGIN_DIR . 'includes/Stats.php';
 require_once TCT_PLUGIN_DIR . 'includes/Changes.php';
 require_once TCT_PLUGIN_DIR . 'includes/Shortcodes.php';
 
+// Machine resources cannot remain deterministic if PHP display_errors writes
+// diagnostics into their response bytes. Logging remains under site policy.
+if (tct_is_protocol_response_request() && function_exists('ini_set')) {
+    @ini_set('display_errors', '0');
+}
+
 add_action('save_post', 'tct_refresh_post_identity', 20, 3);
 add_action('delete_post', 'tct_invalidate_post_identity');
 add_action('trashed_post', 'tct_invalidate_post_identity');
@@ -198,11 +204,23 @@ function tct_request_is_protocol_route($path) {
     return preg_match('~^/(?:.+/)?' . preg_quote($endpoint, '~') . '/?$~', $path) === 1;
 }
 
+function tct_is_protocol_response_request() {
+    if (
+        isset($_GET['tct_m_url'])
+        && is_string($_GET['tct_m_url'])
+        && wp_unslash($_GET['tct_m_url']) === '1'
+    ) {
+        return true;
+    }
+
+    $uri = $_SERVER['REQUEST_URI'] ?? '';
+    $path = parse_url((string) $uri, PHP_URL_PATH);
+    return tct_request_is_protocol_route($path);
+}
+
 function tct_prevent_404_on_endpoints($preempt, $wp_query) {
     unset($wp_query);
-    $uri = $_SERVER['REQUEST_URI'] ?? '';
-    $path = parse_url($uri, PHP_URL_PATH);
-    if (tct_request_is_protocol_route($path)) {
+    if (tct_is_protocol_response_request()) {
         return true;
     }
 
@@ -216,10 +234,7 @@ function tct_clear_404_fallback() {
     global $wp_query;
     if (!isset($wp_query)) return;
 
-    $uri = $_SERVER['REQUEST_URI'] ?? '';
-    $path = parse_url($uri, PHP_URL_PATH);
-
-    if (tct_request_is_protocol_route($path) && $wp_query->is_404) {
+    if (tct_is_protocol_response_request() && $wp_query->is_404) {
         $wp_query->is_404 = false;
         status_header(200);
     }
@@ -233,10 +248,14 @@ add_action('template_redirect', 'tct_handle_requests', 0);
 // Add HTML rel="alternate" link for pages/front page (optional but recommended)
 add_action('wp_head', 'tct_output_html_alternate_link', 5);
 
-// Add the generic index link; the retrieved profile identifies TCT.
-add_action('send_headers', 'tct_add_root_link_header');
+// Add C-URL discovery only after WordPress has established query state.
+add_action('template_redirect', 'tct_add_root_link_header', -1);
 
 function tct_add_root_link_header() {
+    if (tct_is_protocol_response_request()) {
+        return;
+    }
+
     // Only add Link header on homepage (root)
     if (!is_front_page() && !is_home()) {
         return;
