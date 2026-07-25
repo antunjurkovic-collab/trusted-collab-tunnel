@@ -44,9 +44,11 @@ under `includes/`.
   `no-transform`.
 - Canonicalization is bounded by depth, node, key, string, and total identity
   bytes. Sitemap queries and item counts are bounded independently.
-- PHP 8.1 and WordPress 6.0 are the declared internal floors. A disposable
-  WordPress integration matrix is still required before public support is
-  claimed.
+- PHP 8.1 and WordPress 6.0 are the declared internal floors. The internal
+  disposable minimum/current matrix is recorded in
+  [`docs/ALPHA2_CHECKPOINT_PLAN_AND_EVIDENCE.md`](docs/ALPHA2_CHECKPOINT_PLAN_AND_EVIDENCE.md).
+  This does not claim public support; a selected production origin, proxy, and
+  CDN configuration must be validated independently.
 
 ## Non-Core Experiments
 
@@ -112,4 +114,5 @@ activate it. Default core resources are:
 
 Do not publish alpha.2 or describe it as conforming to a published `-03`
 revision until the exact pinned draft text is submitted without a
-wire-affecting change and the disposable integration evidence is green.
+wire-affecting change and legal, public-facing metadata, and the selected
+deployment path receive separate review.

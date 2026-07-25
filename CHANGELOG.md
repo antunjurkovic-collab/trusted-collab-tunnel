@@ -24,6 +24,14 @@ not been submitted.
   receipt-bearing M-URL responses private/non-storeable.
 - Added deterministic clean-commit package construction and embedded evidence
   manifests.
+- Unslashed WordPress-normalized `If-None-Match` values before parsing them.
+- Added an exact query-style M-URL route for plain-permalink sites and
+  invalidated cached URL identities when permalink structure changes.
+- Deferred C-URL discovery headers until WordPress query state is available.
+- Prevented displayed PHP diagnostics from contaminating protocol response
+  bytes while leaving diagnostic logging under site policy.
+- Added raw-byte live validation, compression-advertisement probes, and
+  disposable minimum/current WordPress integration evidence.
 
 ## 3.0.0-alpha.1 — frozen internal reconstruction
 
