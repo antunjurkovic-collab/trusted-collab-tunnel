@@ -53,8 +53,12 @@ function tct_stats_record($m_url, $status, $body_len = 0) {
 
     // Cap map sizes to avoid option bloat
     if (count($store['murls']) > 500) {
-        // keep most recent 500 by hits heuristic
-        arsort($store['murls']);
+        // Keep the 500 most frequently accessed resources.
+        uasort(
+            $store['murls'],
+            static fn($left, $right) => (int) ($right['hits'] ?? 0)
+                <=> (int) ($left['hits'] ?? 0)
+        );
         $store['murls'] = array_slice($store['murls'], 0, 500, true);
     }
     if (count($store['last_body_len']) > 1000) {

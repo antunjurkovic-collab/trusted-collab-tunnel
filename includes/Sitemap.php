@@ -1,209 +1,244 @@
 <?php
 if (!defined('ABSPATH')) { exit; }
 
+/**
+ * Serve the Draft-03 M-Sitemap identity representation.
+ */
 function tct_output_sitemap() {
-    // PHASE 2.1: 304 FAST-PATH - Check cached sitemap + strong ETag first (zero-fetch path)
-    $cached_json = get_transient('tct_sitemap_json_v3');
-    $cached_etag = get_transient('tct_sitemap_etag_v3');
+    $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+    if (!\TCT\Draft03\ConditionalRequest::isSafeReadMethod($method)) {
+        status_header(405);
+        header('Allow: GET, HEAD', true);
+        exit;
+    }
 
-    if ($cached_json && $cached_etag) {
-        // Check If-None-Match for 304
-        $inm = isset($_SERVER['HTTP_IF_NONE_MATCH']) ? trim($_SERVER['HTTP_IF_NONE_MATCH']) : '';
-        if ($inm) {
-            // Normalize ETags: strip quotes, weak prefix, handle comma-separated lists
-            foreach (explode(',', $inm) as $tok) {
-                $t = trim($tok);
-                if (stripos($t, 'W/') === 0) { $t = trim(substr($t, 2)); }
-                if (strlen($t) >= 2 && $t[0] === '"' && substr($t, -1) === '"') {
-                    $t = substr($t, 1, -1);
-                }
-
-                if ($t === $cached_etag) {
-                    // 304 - NO QUERY OR BUILD WORK!
-                    status_header(304);
-                    header('Content-Type: application/json; charset=UTF-8; profile="tct-1"', true);
-                    header('ETag: "' . $cached_etag . '"', true);
-                    header('Cache-Control: public, max-age=3600, must-revalidate', true);
-                    header('Vary: Accept-Encoding', true);
-
-                    // Support HEAD
-                    if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'HEAD') {
-                        exit;
-                    }
-                    exit;
-                }
-            }
-        }
-
-        // Cache hit but no 304 - serve cached JSON (200 from cache)
-        status_header(200);
-        header('Content-Type: application/json; charset=UTF-8; profile="tct-1"', true);
-        header('ETag: "' . $cached_etag . '"', true);
-
-        // Add Content-Digest (RFC 9530)
-        $body_hash_bin = hash('sha256', $cached_json, true);
-        $body_hash_b64 = base64_encode($body_hash_bin);
-        header('Content-Digest: sha-256=:' . $body_hash_b64 . ':', false);
-
-        header('Cache-Control: public, max-age=3600, must-revalidate', true);
+    if (!\TCT\Draft03\AcceptEncoding::identityIsAllowed($_SERVER['HTTP_ACCEPT_ENCODING'] ?? null)) {
+        status_header(406);
         header('Vary: Accept-Encoding', true);
+        exit;
+    }
 
-        // Support HEAD
-        if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'HEAD') {
+    if (tct_auth_required() && !tct_auth_ok()) {
+        status_header(401);
+        header('WWW-Authenticate: Bearer realm="tct"');
+        header('Cache-Control: private, no-store', true);
+        exit;
+    }
+
+    $identity = tct_get_cached_sitemap_identity();
+    if ($identity === null) {
+        try {
+            $identity = tct_build_sitemap_identity();
+            tct_set_cached_sitemap_identity($identity);
+        } catch (\Throwable $exception) {
+            error_log('TCT Draft-03 M-Sitemap build failed: ' . $exception->getMessage());
+            status_header(503);
+            header('Cache-Control: no-store', true);
+            header('Retry-After: 60', true);
             exit;
         }
+    }
 
-        echo $cached_json;
+    $if_none_match = isset($_SERVER['HTTP_IF_NONE_MATCH'])
+        ? (string) $_SERVER['HTTP_IF_NONE_MATCH']
+        : '';
+    if (
+        $if_none_match !== ''
+        && \TCT\Draft03\ConditionalRequest::ifNoneMatchMatches($if_none_match, $identity->etag)
+    ) {
+        status_header(304);
+        tct_send_sitemap_identity_headers($identity, false);
         exit;
     }
 
-    // Cache miss - build fresh
-
-    $endpoint = trim(get_option('tct_endpoint_slug', 'llm'));
-    // Collect recent posts/pages (publish). Sites can filter this query.
-    // Default behavior: exclude WooCommerce 'product' CPT and the Shop page.
-    $public = get_post_types(['public' => true], 'names');
-    $default_excluded = apply_filters('tct_sitemap_excluded_post_types', ['product']);
-    if (!is_array($default_excluded)) { $default_excluded = ['product']; }
-    $post_types = array_values(array_diff($public, $default_excluded));
-
-    $post_not_in = [];
-    if (function_exists('wc_get_page_id')) {
-        $shop_id = (int) wc_get_page_id('shop');
-        if ($shop_id > 0) { $post_not_in[] = $shop_id; }
-    }
-    $posts_page_id = (int) get_option('page_for_posts');
-    if ($posts_page_id > 0) {
-        // The posts page behaves as an archive, not as a singular content M-URL.
-        $post_not_in[] = $posts_page_id;
-    }
-    $front_page_id = (int) get_option('page_on_front');
-    if ($front_page_id > 0) {
-        // The front page is added explicitly as the first sitemap entry.
-        $post_not_in[] = $front_page_id;
-    }
-
-    // PHASE 2.3: Optimize query with performance flags
-    $qargs = [
-        'post_type' => $post_types,
-        'post_status' => 'publish',
-        'post__not_in' => $post_not_in,
-        'posts_per_page' => -1,  // Include ALL posts
-        'orderby' => 'modified',
-        'order' => 'DESC',
-        'fields' => 'ids',  // Already present
-
-        // Performance flags (from wp-dual-native pattern)
-        'no_found_rows' => true,              // Skip SQL_CALC_FOUND_ROWS
-        'update_post_term_cache' => false,    // Skip category/tag cache warming
-        'update_post_meta_cache' => false,    // Skip meta cache warming (we fetch individually)
-    ];
-    $qargs = apply_filters('tct_sitemap_query_args', $qargs);
-    $ids = get_posts($qargs);
-
-    $entries = [];
-
-    // Add homepage as first item
-    $home_url = trailingslashit(home_url('/'));
-    $home_m_url = $home_url . trailingslashit($endpoint);
-
-    // Determine homepage type and hash
-    $front_id = (int) get_option('page_on_front');
-    if ($front_id) {
-        // Static homepage - use actual page content
-        $home_post = get_post($front_id);
-        if ($home_post) {
-            // Use unified helper: ensures sitemap etag == M-URL ETag (expert review fix)
-            list(, $etag) = tct_build_tct_payload_and_hash($home_post, $home_url, $home_m_url);
-            $modified = get_post_modified_time('c', true, $home_post);
-
-            $entries[] = [
-                'cUrl' => $home_url,
-                'mUrl' => $home_m_url,
-                'lastModified' => $modified,
-                'etag' => $etag,
-            ];
-        }
-    } else {
-        // Blog list homepage - use synthetic content
-        if (function_exists('tct_create_homepage_pseudo_post')) {
-            $pseudo = tct_create_homepage_pseudo_post();
-            // Use unified helper: ensures sitemap etag == M-URL ETag (expert review fix)
-            list(, $etag) = tct_build_tct_payload_and_hash($pseudo, $home_url, $home_m_url);
-            $modified = gmdate('c', strtotime($pseudo->post_modified_gmt));
-
-            $entries[] = [
-                'cUrl' => $home_url,
-                'mUrl' => $home_m_url,
-                'lastModified' => $modified,
-                'etag' => $etag,
-            ];
-        }
-    }
-
-    // PHASE 2.2: Read ETags from post meta (NOT regenerate)
-    // This turns O(N Ã— expensive) into O(N Ã— cheap meta lookup)
-    foreach ((array)$ids as $pid) {
-        $c_url = get_permalink($pid);
-        if (!$c_url) { continue; }
-        $m_url = trailingslashit($c_url) . trailingslashit($endpoint);
-
-        // Read cached ETag from post meta (precomputed on save_post)
-        $etag = get_post_meta($pid, '_tct_etag', true);
-
-        // If missing (rare - first request or cache cleared), compute once
-        if (!$etag) {
-            $post = get_post($pid);
-            list(, $etag) = tct_build_tct_payload_and_hash(
-                $post,
-                trailingslashit($c_url),
-                trailingslashit($m_url)
-            );
-            // Note: tct_build_tct_payload_and_hash now stores in post meta (Phase 1.2)
-        }
-
-        $entries[] = [
-            'cUrl' => trailingslashit($c_url),
-            'mUrl' => trailingslashit($m_url),
-            'lastModified' => get_post_modified_time('c', true, $pid),
-            'etag' => $etag,
-        ];
-    }
-    // Per draft-03: version 2 for updated spec
-    $out = [
-        'version' => 2,
-        'profile' => 'tct-1',
-        'items' => $entries,
-    ];
-
-    // Generate deterministic JSON bytes for the sitemap response.
-    $json = tct_canonical_json_encode($out);
-
-    // PHASE 2.4: Compute strong ETag from final JSON bytes
-    $etag = 'sha256-' . hash('sha256', $json);
-
-    // Cache both JSON and ETag for fast revalidation
-    set_transient('tct_sitemap_json_v3', $json, 3600);
-    set_transient('tct_sitemap_etag_v3', $etag, 3600);
-
-    // Send 200 response with strong validator
     status_header(200);
-    header('Content-Type: application/json; charset=UTF-8; profile="tct-1"', true);
-    header('ETag: "' . $etag . '"', true);
-
-    // Content-Digest for integrity (RFC 9530)
-    $body_hash_bin = hash('sha256', $json, true);
-    $body_hash_b64 = base64_encode($body_hash_bin);
-    header('Content-Digest: sha-256=:' . $body_hash_b64 . ':', false);
-
-    header('Cache-Control: public, max-age=3600, must-revalidate', true);
-    header('Vary: Accept-Encoding', true);
-
-    // Support HEAD
-    if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'HEAD') {
+    tct_send_sitemap_identity_headers($identity, true);
+    if ($method === 'HEAD') {
         exit;
     }
 
-    echo $json;
+    echo $identity->body;
+    exit;
 }
 
+/**
+ * Build a catalog from exact current/cached M-URL identity representations.
+ */
+function tct_build_sitemap_identity() {
+    $maximum_items = (int) apply_filters('tct_sitemap_max_items', 10000);
+    $maximum_items = max(1, min(100000, $maximum_items));
+
+    $public_types = get_post_types(['public' => true], 'names');
+    if (!is_array($public_types)) {
+        $public_types = [];
+    }
+    $excluded_types = apply_filters('tct_sitemap_excluded_post_types', ['attachment', 'product']);
+    if (!is_array($excluded_types)) {
+        $excluded_types = ['attachment', 'product'];
+    }
+    $post_types = array_values(array_diff($public_types, $excluded_types));
+
+    $excluded_ids = [];
+    foreach (['page_for_posts', 'page_on_front'] as $option) {
+        $id = (int) get_option($option, 0);
+        if ($id > 0) {
+            $excluded_ids[] = $id;
+        }
+    }
+    if (function_exists('wc_get_page_id')) {
+        $shop_id = (int) wc_get_page_id('shop');
+        if ($shop_id > 0) {
+            $excluded_ids[] = $shop_id;
+        }
+    }
+
+    $query = [
+        'post_type' => $post_types,
+        'post_status' => 'publish',
+        'post__not_in' => array_values(array_unique($excluded_ids)),
+        'posts_per_page' => $maximum_items + 1,
+        'orderby' => 'ID',
+        'order' => 'ASC',
+        'fields' => 'ids',
+        'no_found_rows' => true,
+        'update_post_term_cache' => false,
+        'update_post_meta_cache' => false,
+    ];
+    $query = apply_filters('tct_sitemap_query_args', $query);
+    if (!is_array($query)) {
+        throw new \RuntimeException('Sitemap query filter must return an array.');
+    }
+
+    // Filters cannot turn the bounded reference implementation into an
+    // unbounded or authorization-broadening query.
+    $query['post_type'] = $post_types;
+    $query['post_status'] = 'publish';
+    $query['post__not_in'] = array_values(array_unique($excluded_ids));
+    $query['posts_per_page'] = $maximum_items + 1;
+    $query['orderby'] = 'ID';
+    $query['order'] = 'ASC';
+    $query['fields'] = 'ids';
+    $query['no_found_rows'] = true;
+    $ids = array_values(array_unique(array_map('intval', (array) get_posts($query))));
+    sort($ids, SORT_NUMERIC);
+
+    $homepage_post = tct_protocol_homepage_post();
+    $homepage_count = $homepage_post !== null ? 1 : 0;
+    if (count($ids) + $homepage_count > $maximum_items) {
+        throw new \RuntimeException('M-Sitemap exceeds the configured item limit.');
+    }
+
+    $items = [];
+    if ($homepage_post !== null) {
+        $items[] = tct_sitemap_item_for_post($homepage_post);
+    }
+
+    foreach ($ids as $post_id) {
+        $post = get_post($post_id);
+        if (!$post || !tct_post_is_exposable($post)) {
+            continue;
+        }
+        $items[] = tct_sitemap_item_for_post($post);
+    }
+
+    $c_urls = array_column($items, 'cUrl');
+    $m_urls = array_column($items, 'mUrl');
+    if (count($c_urls) !== count(array_unique($c_urls, SORT_STRING))) {
+        throw new \RuntimeException('M-Sitemap contains duplicate C-URLs.');
+    }
+    if (count($m_urls) !== count(array_unique($m_urls, SORT_STRING))) {
+        throw new \RuntimeException('M-Sitemap contains duplicate M-URLs.');
+    }
+
+    $value = [
+        'version' => \TCT\Draft03\Protocol::M_SITEMAP_VERSION,
+        'profile' => \TCT\Draft03\Protocol::M_SITEMAP_PROFILE,
+        'items' => $items,
+    ];
+    $value = apply_filters('tct_sitemap_document', $value);
+    if (!is_array($value)) {
+        throw new \TCT\Draft03\SchemaException('Sitemap document filter must return an object.');
+    }
+
+    $document = \TCT\Draft03\MSitemapDocument::fromArray($value);
+    $identity = \TCT\Draft03\IdentityRepresentation::fromValue($document);
+    $maximum_bytes = (int) apply_filters('tct_sitemap_max_bytes', 16777216);
+    $maximum_bytes = max(1024, min(\TCT\Draft03\Protocol::MAX_IDENTITY_BYTES, $maximum_bytes));
+    if (strlen($identity->body) > $maximum_bytes) {
+        throw new \RuntimeException('M-Sitemap exceeds the configured byte limit.');
+    }
+
+    return $identity;
+}
+
+/**
+ * Return the one homepage representation used by both catalog and endpoint.
+ */
+function tct_protocol_homepage_post() {
+    $front_id = (int) get_option('page_on_front', 0);
+    $post = $front_id > 0 ? get_post($front_id) : tct_create_homepage_pseudo_post();
+    return $post && tct_post_is_exposable($post) ? $post : null;
+}
+
+/**
+ * Build a catalog item only after obtaining its exact identity M-URL ETag.
+ */
+function tct_sitemap_item_for_post($post) {
+    $c_url = tct_c_url_for_post($post);
+    if (!is_string($c_url) || $c_url === '') {
+        throw new \RuntimeException('Exposable post has no C-URL.');
+    }
+    $m_url = tct_m_url_for_c_url($c_url);
+    $resource_id = isset($post->ID) ? (int) $post->ID : 0;
+    $identity = tct_get_cached_identity($resource_id);
+    if ($identity === null) {
+        [, $identity] = tct_build_murl_identity($post, $c_url, $m_url);
+        tct_set_cached_identity($resource_id, $identity);
+    }
+
+    $modified_timestamp = isset($post->post_modified_gmt)
+        ? strtotime((string) $post->post_modified_gmt . ' UTC')
+        : false;
+    $modified = $modified_timestamp !== false ? gmdate('c', $modified_timestamp) : null;
+    if ($resource_id > 0) {
+        $modified = get_post_modified_time('c', true, $post);
+    }
+
+    $item = [
+        'cUrl' => $c_url,
+        'mUrl' => $m_url,
+        'etag' => $identity->catalogEtag(),
+    ];
+    if (is_string($modified) && $modified !== '') {
+        $item['lastModified'] = $modified;
+    }
+
+    return $item;
+}
+
+function tct_send_sitemap_identity_headers($identity, $include_content_headers) {
+    if (!($identity instanceof \TCT\Draft03\IdentityRepresentation)) {
+        throw new \InvalidArgumentException('Expected a certified sitemap identity representation.');
+    }
+
+    if (function_exists('ini_set')) {
+        @ini_set('zlib.output_compression', '0');
+    }
+
+    $cache_control = tct_auth_required()
+        ? 'private, max-age=0, must-revalidate, no-transform'
+        : 'public, max-age=300, must-revalidate, stale-if-error=86400, no-transform';
+    header('ETag: ' . $identity->etag, true);
+    header('Cache-Control: ' . $cache_control, true);
+    header('Vary: Accept-Encoding', true);
+    header(
+        'Link: <' . \TCT\Draft03\Protocol::M_SITEMAP_PROFILE . '>; rel="profile"',
+        false
+    );
+
+    if ($include_content_headers) {
+        header('Content-Type: ' . \TCT\Draft03\Protocol::CONTENT_TYPE, true);
+        header('Content-Digest: ' . $identity->contentDigest, true);
+        header('Content-Length: ' . strlen($identity->body), true);
+    }
+}

@@ -1,40 +1,21 @@
 param(
-    [string]$BaseUrl = 'https://llmpages.org',
+    [Parameter(Mandatory = $true)]
+    [string]$BaseUrl,
+    [string]$SitemapPath = '/llm-sitemap.json',
     [int]$SampleMurls = 10,
+    [string]$ApiKey = '',
     [switch]$CheckExtensions
 )
 
 $ErrorActionPreference = 'Stop'
 $BaseUrl = $BaseUrl.TrimEnd('/')
 $checks = New-Object System.Collections.Generic.List[object]
+$mUrlProfile = 'https://www.ietf.org/archive/id/draft-jurkovikj-collab-tunnel-03.html#tct-m-url-profile'
+$sitemapProfile = 'https://www.ietf.org/archive/id/draft-jurkovikj-collab-tunnel-03.html#tct-m-sitemap-profile'
 
 function Add-Check {
     param([string]$Name, [bool]$Ok, [string]$Detail = '')
     $script:checks.Add([pscustomobject]@{ name = $Name; ok = $Ok; detail = $Detail }) | Out-Null
-}
-
-function Invoke-Get {
-    param([string]$Url, [hashtable]$Headers = @{})
-    try {
-        $response = Invoke-WebRequest -UseBasicParsing -Uri $Url -Headers $Headers -TimeoutSec 30 -ErrorAction Stop
-        return [pscustomobject]@{ status = [int]$response.StatusCode; headers = $response.Headers; body = $response.Content }
-    } catch {
-        $resp = $_.Exception.Response
-        if (-not $resp) { throw }
-        $reader = New-Object IO.StreamReader($resp.GetResponseStream())
-        return [pscustomobject]@{ status = [int]$resp.StatusCode; headers = $resp.Headers; body = $reader.ReadToEnd() }
-    }
-}
-
-function Get-CurlStatus {
-    param([string]$Url, [string]$Etag)
-    $args = @('-s', '-D', '-', '-o', 'NUL')
-    if ($Etag) { $args += @('-H', "If-None-Match: $Etag") }
-    $args += $Url
-    $lines = & curl.exe @args
-    $statusLine = @($lines | Where-Object { $_ -match '^HTTP/' } | Select-Object -Last 1)[0]
-    if ($statusLine -match '^HTTP/\S+\s+(\d+)') { return [int]$matches[1] }
-    return 0
 }
 
 function Header-Value {
@@ -44,67 +25,161 @@ function Header-Value {
     return [string]$value
 }
 
-$root = Invoke-Get "$BaseUrl/"
+function Invoke-TctRequest {
+    param(
+        [string]$Url,
+        [string]$Method = 'GET',
+        [hashtable]$AdditionalHeaders = @{}
+    )
+
+    $headers = @{ 'Accept-Encoding' = 'identity' }
+    if ($ApiKey -ne '') { $headers['X-API-Key'] = $ApiKey }
+    foreach ($entry in $AdditionalHeaders.GetEnumerator()) {
+        $headers[$entry.Key] = $entry.Value
+    }
+
+    try {
+        $response = Invoke-WebRequest -UseBasicParsing -Uri $Url -Method $Method `
+            -Headers $headers -TimeoutSec 30 -ErrorAction Stop
+        return [pscustomobject]@{
+            status = [int]$response.StatusCode
+            headers = $response.Headers
+            body = [string]$response.Content
+        }
+    } catch {
+        $response = $_.Exception.Response
+        if (-not $response) { throw }
+        $body = ''
+        if ($response.GetResponseStream()) {
+            $reader = New-Object IO.StreamReader($response.GetResponseStream())
+            $body = $reader.ReadToEnd()
+        }
+        return [pscustomobject]@{
+            status = [int]$response.StatusCode
+            headers = $response.Headers
+            body = $body
+        }
+    }
+}
+
+function Get-IdentityMetadata {
+    param([string]$Body)
+    $bytes = [Text.Encoding]::UTF8.GetBytes($Body)
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { $digest = $sha.ComputeHash($bytes) } finally { $sha.Dispose() }
+    $hex = -join ($digest | ForEach-Object { $_.ToString('x2') })
+    return [pscustomobject]@{
+        etag = "`"sha256-$hex`""
+        contentDigest = 'sha-256=:' + [Convert]::ToBase64String($digest) + ':'
+        bytes = $bytes.Length
+    }
+}
+
+function Test-IdentityResponse {
+    param(
+        [string]$Prefix,
+        $Response,
+        [string]$ExpectedProfile,
+        [string]$RequiredProfileLink
+    )
+
+    $contentType = Header-Value $Response.headers 'Content-Type'
+    $etag = Header-Value $Response.headers 'ETag'
+    $digest = Header-Value $Response.headers 'Content-Digest'
+    $link = Header-Value $Response.headers 'Link'
+    $metadata = Get-IdentityMetadata $Response.body
+    $json = $null
+    try { $json = $Response.body | ConvertFrom-Json } catch {}
+
+    Add-Check "$Prefix status_200" ($Response.status -eq 200) "status=$($Response.status)"
+    Add-Check "$Prefix content_type_exact" ($contentType -eq 'application/json') $contentType
+    Add-Check "$Prefix json_parse" ($null -ne $json)
+    Add-Check "$Prefix exact_profile" (
+        $null -ne $json -and $json.profile -eq $ExpectedProfile
+    ) "profile=$($json.profile)"
+    Add-Check "$Prefix etag_exact_body_hash" ($etag -eq $metadata.etag) "actual=$etag expected=$($metadata.etag)"
+    Add-Check "$Prefix digest_exact_body_hash" ($digest -eq $metadata.contentDigest) "actual=$digest expected=$($metadata.contentDigest)"
+    Add-Check "$Prefix content_length" (
+        (Header-Value $Response.headers 'Content-Length') -eq [string]$metadata.bytes
+    )
+    Add-Check "$Prefix profile_link" ($link -match [regex]::Escape($RequiredProfileLink)) $link
+    Add-Check "$Prefix varies_accept_encoding" (
+        (Header-Value $Response.headers 'Vary') -match '(?i)(^|,\s*)Accept-Encoding($|,)'
+    )
+    Add-Check "$Prefix no_transform" (
+        (Header-Value $Response.headers 'Cache-Control') -match '(?i)(^|,|\s)no-transform($|,|\s)'
+    )
+
+    return [pscustomobject]@{ json = $json; etag = $etag; metadata = $metadata }
+}
+
+$root = Invoke-TctRequest "$BaseUrl/"
 $rootLink = Header-Value $root.headers 'Link'
 Add-Check 'root_status_200' ($root.status -eq 200) "status=$($root.status)"
-Add-Check 'root_link_profile_tct_1' ($rootLink -match 'profile="tct-1"') $rootLink
+Add-Check 'root_generic_index_link' (
+    $rootLink -match 'rel="index"' -and
+    $rootLink -match 'type="application/json"' -and
+    $rootLink -notmatch 'profile='
+) $rootLink
 
-$sitemapUrl = "$BaseUrl/llm-sitemap.json?validate_live=$([Guid]::NewGuid().ToString('N'))"
-$sitemapResp = Invoke-Get $sitemapUrl @{ 'Cache-Control' = 'no-cache'; 'Pragma' = 'no-cache' }
-$sitemap = $null
-try { $sitemap = $sitemapResp.body | ConvertFrom-Json } catch {}
-Add-Check 'sitemap_status_200' ($sitemapResp.status -eq 200) "status=$($sitemapResp.status)"
-Add-Check 'sitemap_json_parse' ($null -ne $sitemap)
-Add-Check 'sitemap_has_etag' ([bool](Header-Value $sitemapResp.headers 'ETag'))
-Add-Check 'sitemap_has_content_digest' ([bool](Header-Value $sitemapResp.headers 'Content-Digest'))
-
+$sitemapUrl = "$BaseUrl/$($SitemapPath.TrimStart('/'))"
+$sitemapResponse = Invoke-TctRequest $sitemapUrl 'GET' @{ 'Cache-Control' = 'no-cache' }
+$sitemapResult = Test-IdentityResponse 'sitemap' $sitemapResponse $sitemapProfile $sitemapProfile
 $items = @()
-if ($sitemap) {
-    $items = @($sitemap.items)
-    Add-Check 'sitemap_version_2' ($sitemap.version -eq 2) "version=$($sitemap.version)"
-    Add-Check 'sitemap_profile_tct_1' ($sitemap.profile -eq 'tct-1') "profile=$($sitemap.profile)"
-    Add-Check 'sitemap_has_items' ($items.Count -gt 0) "count=$($items.Count)"
-
-    $blog = @($items | Where-Object { [string]$_.mUrl -match '/blog/llm/?$' })
-    Add-Check 'sitemap_excludes_blog_archive_murl' ($blog.Count -eq 0) "count=$($blog.Count)"
-
-    $dups = @($items | Group-Object mUrl | Where-Object { $_.Count -gt 1 })
-    Add-Check 'sitemap_has_no_duplicate_murls' ($dups.Count -eq 0) "duplicate_count=$($dups.Count)"
-
-    $shapeBad = @($items | Where-Object {
-        -not $_.cUrl -or -not $_.mUrl -or -not $_.etag -or -not $_.lastModified -or $_.PSObject.Properties.Name -contains 'hash' -or $_.PSObject.Properties.Name -contains 'modified'
+if ($sitemapResult.json) {
+    $items = @($sitemapResult.json.items)
+    Add-Check 'sitemap_version_2' ($sitemapResult.json.version -eq 2)
+    $duplicateCurls = @($items | Group-Object cUrl | Where-Object { $_.Count -gt 1 })
+    $duplicateMurls = @($items | Group-Object mUrl | Where-Object { $_.Count -gt 1 })
+    Add-Check 'sitemap_unique_curls' ($duplicateCurls.Count -eq 0) "duplicates=$($duplicateCurls.Count)"
+    Add-Check 'sitemap_unique_murls' ($duplicateMurls.Count -eq 0) "duplicates=$($duplicateMurls.Count)"
+    $invalidHints = @($items | Where-Object {
+        $_.etag -and [string]$_.etag -notmatch '^sha256-[0-9a-f]{64}$'
     })
-    Add-Check 'sitemap_item_shape_draft03' ($shapeBad.Count -eq 0) "bad_count=$($shapeBad.Count)"
+    Add-Check 'sitemap_hint_shape' ($invalidHints.Count -eq 0) "invalid=$($invalidHints.Count)"
 }
 
-$sample = @($items | Select-Object -First $SampleMurls)
-foreach ($item in $sample) {
+$sitemapConditional = Invoke-TctRequest $sitemapUrl 'GET' @{
+    'If-None-Match' = $sitemapResult.etag
+}
+Add-Check 'sitemap_if_none_match_304' ($sitemapConditional.status -eq 304) "status=$($sitemapConditional.status)"
+Add-Check 'sitemap_304_current_etag' (
+    (Header-Value $sitemapConditional.headers 'ETag') -eq $sitemapResult.etag
+)
+
+foreach ($item in @($items | Select-Object -First $SampleMurls)) {
     $mUrl = [string]$item.mUrl
-    $mResp = Invoke-Get $mUrl
-    $mJson = $null
-    try { $mJson = $mResp.body | ConvertFrom-Json } catch {}
-    $headerEtag = Header-Value $mResp.headers 'ETag'
-    $bareHeaderEtag = $headerEtag.Trim('"')
     $prefix = "murl:$mUrl"
+    $response = Invoke-TctRequest $mUrl
+    $result = Test-IdentityResponse $prefix $response $mUrlProfile $mUrlProfile
+    $link = Header-Value $response.headers 'Link'
+    Add-Check "$prefix canonical_link" ($link -match 'rel="canonical"') $link
+    Add-Check "$prefix catalog_hint_matches" (
+        $result.etag.Trim('"') -eq [string]$item.etag
+    ) "header=$($result.etag) hint=$($item.etag)"
 
-    Add-Check "$prefix status_200" ($mResp.status -eq 200) "status=$($mResp.status)"
-    Add-Check "$prefix json_parse" ($null -ne $mJson)
-    Add-Check "$prefix has_etag" ([bool]$headerEtag)
-    Add-Check "$prefix etag_matches_sitemap" ($bareHeaderEtag -eq [string]$item.etag) "header=$headerEtag sitemap=$($item.etag)"
-    Add-Check "$prefix has_content_digest" ([bool](Header-Value $mResp.headers 'Content-Digest'))
-    if ($mJson) {
-        $props = @($mJson.PSObject.Properties.Name)
-        Add-Check "$prefix body_profile_tct_1" ($mJson.profile -eq 'tct-1') "profile=$($mJson.profile)"
-        Add-Check "$prefix body_no_hash_or_modified" (-not ($props -contains 'hash') -and -not ($props -contains 'modified'))
-    }
-    $revalidateStatus = Get-CurlStatus $mUrl $headerEtag
-    Add-Check "$prefix if_none_match_304" ($revalidateStatus -eq 304) "status=$revalidateStatus"
+    $conditional = Invoke-TctRequest $mUrl 'GET' @{ 'If-None-Match' = $result.etag }
+    Add-Check "$prefix if_none_match_304" ($conditional.status -eq 304) "status=$($conditional.status)"
+    Add-Check "$prefix 304_current_etag" (
+        (Header-Value $conditional.headers 'ETag') -eq $result.etag
+    )
+
+    $head = Invoke-TctRequest $mUrl 'HEAD'
+    Add-Check "$prefix head_200" ($head.status -eq 200) "status=$($head.status)"
+    Add-Check "$prefix head_same_etag" (
+        (Header-Value $head.headers 'ETag') -eq $result.etag
+    )
 }
+
+$methodProbe = Invoke-TctRequest $sitemapUrl 'POST'
+Add-Check 'catalog_post_405' ($methodProbe.status -eq 405) "status=$($methodProbe.status)"
+$encodingProbe = Invoke-TctRequest $sitemapUrl 'GET' @{ 'Accept-Encoding' = 'identity;q=0' }
+Add-Check 'catalog_identity_forbidden_406' ($encodingProbe.status -eq 406) "status=$($encodingProbe.status)"
 
 if ($CheckExtensions) {
     foreach ($path in @('/llms.txt', '/llm-policy.json', '/llm-stats.json', '/llm-changes.json')) {
-        $r = Invoke-Get "$BaseUrl$path"
-        Add-Check "extension:$path status_200" ($r.status -eq 200) "status=$($r.status) bytes=$($r.body.Length)"
+        $response = Invoke-TctRequest "$BaseUrl$path"
+        Add-Check "extension:$path reachable" ($response.status -eq 200) "status=$($response.status)"
     }
 }
 

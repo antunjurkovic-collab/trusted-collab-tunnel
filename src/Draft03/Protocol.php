@@ -20,6 +20,20 @@ final class Protocol
 
     public const CACHE_NAMESPACE = 'tct_v03_alpha2';
 
+    public const MAX_JSON_DEPTH = 64;
+
+    public const MAX_JSON_NODES = 100000;
+
+    public const MAX_JSON_KEY_BYTES = 16384;
+
+    public const MAX_JSON_STRING_BYTES = 4194304;
+
+    public const MAX_IDENTITY_BYTES = 16777216;
+
+    public const MAX_SOURCE_BYTES = 8388608;
+
+    public const MAX_EXTRACTED_ITEMS = 10000;
+
     private function __construct()
     {
     }

@@ -4,18 +4,24 @@ declare(strict_types=1);
 
 namespace TCT\Draft03;
 
-final readonly class IdentityRepresentation
+final class IdentityRepresentation
 {
     private function __construct(
-        public string $body,
-        public string $etag,
-        public string $contentDigest
+        public readonly string $body,
+        public readonly string $etag,
+        public readonly string $contentDigest
     ) {
     }
 
     public static function fromValue(mixed $value, ?JcsEncoder $encoder = null): self
     {
         $body = ($encoder ?? new JcsEncoder())->encode($value);
+
+        return self::fromBody($body);
+    }
+
+    public static function fromBody(string $body): self
+    {
         $binaryDigest = hash('sha256', $body, true);
         $opaqueTag = 'sha256-' . bin2hex($binaryDigest);
 

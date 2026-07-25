@@ -2,11 +2,23 @@
 if (!defined('ABSPATH')) { exit; }
 
 function tct_handle_requests() {
-    $endpoint = trim(get_option('tct_endpoint_slug', 'llm'));
-    $sitemap_path = get_option('tct_sitemap_path', '/llm-sitemap.json');
+    $endpoint = sanitize_title((string) get_option('tct_endpoint_slug', 'llm'));
+    if ($endpoint === '') {
+        $endpoint = 'llm';
+    }
+    $sitemap_path = (string) parse_url(
+        (string) get_option('tct_sitemap_path', '/llm-sitemap.json'),
+        PHP_URL_PATH
+    );
     // Manifest now defaults to JSON to avoid colliding with llms.txt human-readable guide
-    $manifest_path = get_option('tct_manifest_path', '/llm-manifest.json');
-    $llms_path = get_option('tct_llms_path', '/llms.txt');
+    $manifest_path = (string) parse_url(
+        (string) get_option('tct_manifest_path', '/llm-manifest.json'),
+        PHP_URL_PATH
+    );
+    $llms_path = (string) parse_url(
+        (string) get_option('tct_llms_path', '/llms.txt'),
+        PHP_URL_PATH
+    );
 
     // If rewrite captured root /{endpoint}/, serve it now
     if (get_query_var('tct_llm_root')) {
@@ -40,8 +52,10 @@ function tct_handle_requests() {
         exit;
     }
 
-    $path = parse_url(home_url(add_query_arg([])), PHP_URL_PATH); // not used
     $req_path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+    if (!is_string($req_path)) {
+        return;
+    }
 
     // 1) Sitemap (path match fallback if rewrites not applied)
     if ($req_path === $sitemap_path) {
@@ -75,7 +89,7 @@ function tct_handle_requests() {
     // 5) Page endpoint */{endpoint}/ including root /{endpoint}/
     $root_pattern = '~^/?' . preg_quote($endpoint, '~') . '/?$~';
     if (preg_match($root_pattern, ltrim($req_path, '/'))) {
-        // Root mapping: /llm/ â†’ canonical /
+        // Root suffix maps to the homepage C-URL.
         tct_output_llm_endpoint('/');
         exit;
     }
@@ -89,183 +103,167 @@ function tct_handle_requests() {
 }
 
 function tct_output_llm_endpoint($canonical_path) {
-    $c_url = home_url($canonical_path);
-    $m_url = home_url(trailingslashit($canonical_path) . trailingslashit(trim(get_option('tct_endpoint_slug', 'llm'))));
+    $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+    if (!\TCT\Draft03\ConditionalRequest::isSafeReadMethod($method)) {
+        status_header(405);
+        header('Allow: GET, HEAD', true);
+        exit;
+    }
 
-    // VALIDATION: Only serve endpoints for content pages (not archives)
+    if (!\TCT\Draft03\AcceptEncoding::identityIsAllowed($_SERVER['HTTP_ACCEPT_ENCODING'] ?? null)) {
+        status_header(406);
+        header('Vary: Accept-Encoding', true);
+        exit;
+    }
+
+    $requested_c_url = home_url($canonical_path);
     $post = null;
-    $post_id = url_to_postid($c_url);
+    $post_id = url_to_postid($requested_c_url);
 
     if ($post_id) {
-        // Valid content page (post/page/CPT)
         $post = get_post($post_id);
-    } else {
-        // Check if it's homepage
-        if (untrailingslashit($c_url) === untrailingslashit(home_url('/'))) {
-            $front_id = (int) get_option('page_on_front');
-            if ($front_id) {
-                // Static homepage
-                $post = get_post($front_id);
-            } else {
-                // Blog list homepage - synthesize content
-                $post = tct_create_homepage_pseudo_post();
-            }
-        }
+    } elseif (untrailingslashit($requested_c_url) === untrailingslashit(home_url('/'))) {
+        $front_id = (int) get_option('page_on_front');
+        $post = $front_id ? get_post($front_id) : tct_create_homepage_pseudo_post();
     }
 
-    // If no valid post found, this is an archive page or invalid URL
-    if (!$post) {
+    if (!$post || !tct_post_is_exposable($post)) {
         status_header(404);
         exit;
     }
 
-    // Block specific post types (default: product) until supported
-    $blocked = apply_filters('tct_block_post_types', ['product']);
-    if ($post && is_array($blocked) && in_array($post->post_type, $blocked, true)) {
-        status_header(404);
+    if (tct_auth_required() && !tct_auth_ok()) {
+        status_header(401);
+        header('WWW-Authenticate: Bearer realm="tct"');
+        header('Cache-Control: private, no-store', true);
         exit;
     }
 
-    // Also block WooCommerce shop page (archive-like) until explicitly supported
-    if (function_exists('wc_get_page_id')) {
-        $shop_id = wc_get_page_id('shop');
-        if ($shop_id && $post && (int) $post->ID === (int) $shop_id) {
-            status_header(404);
+    $c_url = tct_c_url_for_post($post);
+    if (!is_string($c_url) || $c_url === '') {
+        status_header(404);
+        exit;
+    }
+    $m_url = tct_m_url_for_c_url($c_url);
+
+    $resource_id = isset($post->ID) ? (int) $post->ID : 0;
+    $identity = tct_get_cached_identity($resource_id);
+
+    if ($identity === null) {
+        try {
+            [, $identity] = tct_build_murl_identity($post, $c_url, $m_url);
+            tct_set_cached_identity($resource_id, $identity);
+        } catch (\Throwable $exception) {
+            error_log('TCT Draft-03 M-URL build failed: ' . $exception->getMessage());
+            status_header(500);
+            header('Cache-Control: no-store', true);
             exit;
         }
     }
 
-    // Optional auth
-    if (tct_auth_required() && !tct_auth_ok()) {
-        status_header(401);
-        header('WWW-Authenticate: Bearer realm="tct"');
-        exit;
-    }
-
-    // PHASE 1.1: 304 FAST-PATH - Check cached ETag BEFORE any payload work
-    // This implements the wp-dual-native pattern: check validators first, compute only if needed
-    $stored_etag = get_post_meta($post->ID, '_tct_etag', true);
-    if ($stored_etag) {
-        $inm = isset($_SERVER['HTTP_IF_NONE_MATCH']) ? trim($_SERVER['HTTP_IF_NONE_MATCH']) : '';
-        if ($inm) {
-            // Normalize ETags: strip quotes, weak prefix, handle comma-separated lists
-            foreach (explode(',', $inm) as $tok) {
-                $t = trim($tok);
-                // Strip weak prefix
-                if (stripos($t, 'W/') === 0) {
-                    $t = trim(substr($t, 2));
-                }
-                // Strip quotes
-                if (strlen($t) >= 2 && $t[0] === '"' && substr($t, -1) === '"') {
-                    $t = substr($t, 1, -1);
-                }
-
-                if ($t === $stored_etag) {
-                    // 304 EXIT - NO PAYLOAD BUILD!
-                    status_header(304);
-                    header('Content-Type: application/json; charset=UTF-8; profile="tct-1"', true);
-                    header('ETag: "' . $stored_etag . '"', true);
-                    header('Cache-Control: max-age=0, must-revalidate, stale-while-revalidate=60, stale-if-error=86400', true);
-                    header('Vary: Accept-Encoding', true);
-
-                    if (function_exists('tct_stats_record')) {
-                        tct_stats_record($m_url, 304, 0);
-                    }
-                    if (tct_receipts_enabled()) {
-                        tct_emit_usage_receipt($stored_etag, 304, 0);
-                    }
-                    exit;
-                }
-            }
-        }
-    }
-
-    // PHASE 1.3: Try cached payload first (hot path for 200 responses)
-    $cached_payload = get_transient('tct_payload_' . $post->ID);
-    $cache_hit = false;
-
-    if ($cached_payload && $stored_etag) {
-        // Serve from cache (hot 200 path)
-        $payload = $cached_payload;
-        $hash = $stored_etag;
-        $cache_hit = true;
-    } else {
-        // Compute fresh (cold path - cache miss or first request)
-        // Use unified helper: ensures M-URL ETag == sitemap etag (expert review fix)
-        // This is the SINGLE SOURCE OF TRUTH for payload and hash computation
-        list($payload, $hash) = tct_build_tct_payload_and_hash($post, $c_url, $m_url);
-
-        // Cache for next time
-        update_post_meta($post->ID, '_tct_etag', $hash);
-        set_transient('tct_payload_' . $post->ID, $payload, WEEK_IN_SECONDS);
-        $cache_hit = false;
-    }
-
-    // CRITICAL: Clear 404 flag early
     if (isset($GLOBALS['wp_query'])) {
         $GLOBALS['wp_query']->is_404 = false;
     }
 
-    // No match - send 200 response with full headers
-    status_header(200);
-
-    // PHASE 1.4: Common headers for both HEAD and GET (with profile parameter per draft-03)
-    header('Content-Type: application/json; charset=UTF-8; profile="tct-1"', true);
-    header('Link: <' . esc_url_raw($c_url) . '>; rel="canonical"', false);
-    header('ETag: "' . $hash . '"', true);
-    // Allow CDN/shared cache revalidation while maintaining freshness
-    header('Cache-Control: max-age=0, must-revalidate, stale-while-revalidate=60, stale-if-error=86400', true);
-    header('Vary: Accept-Encoding', true);
-    tct_emit_policy_links();
-
-    // AI Policy Descriptor (IANA-registered rel="describedby")
-    $policy_url = home_url('/llm-policy.json');
-    header('Link: <' . esc_url_raw($policy_url) . '>; rel="describedby"; type="application/json"', false);
-
-    if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'HEAD') {
-        if (function_exists('tct_stats_record')) { tct_stats_record($m_url, 200, 0); }
+    $if_none_match = isset($_SERVER['HTTP_IF_NONE_MATCH'])
+        ? (string) $_SERVER['HTTP_IF_NONE_MATCH']
+        : '';
+    if (
+        $if_none_match !== ''
+        && \TCT\Draft03\ConditionalRequest::ifNoneMatchMatches($if_none_match, $identity->etag)
+    ) {
+        status_header(304);
+        tct_send_murl_identity_headers($identity, $c_url, false);
+        if (function_exists('tct_stats_record')) {
+            tct_stats_record($m_url, 304, 0);
+        }
+        if (tct_receipts_enabled()) {
+            tct_emit_usage_receipt($identity->catalogEtag(), 304, 0);
+        }
         exit;
     }
 
+    status_header(200);
+    tct_send_murl_identity_headers($identity, $c_url, true);
 
-    // Draft-03: send the same canonical JSON bytes used for strong ETag generation.
-    $body = tct_canonical_json_encode($payload);
-    $blen = strlen($body);
+    if ($method === 'HEAD') {
+        if (function_exists('tct_stats_record')) {
+            tct_stats_record($m_url, 200, 0);
+        }
+        exit;
+    }
 
-    // Per draft-03: Add Content-Digest header (RFC 9530) for integrity
-    // Format: Content-Digest: sha-256=:base64hash:
-    $body_hash_bin = hash('sha256', $body, true);  // Binary hash
-    $body_hash_b64 = base64_encode($body_hash_bin);
-    header('Content-Digest: sha-256=:' . $body_hash_b64 . ':', false);
+    $body_length = strlen($identity->body);
+    if (function_exists('tct_stats_record')) {
+        tct_stats_record($m_url, 200, $body_length);
+    }
+    if (tct_receipts_enabled()) {
+        tct_emit_usage_receipt($identity->catalogEtag(), 200, $body_length);
+    }
 
-    if (function_exists('tct_stats_record')) { tct_stats_record($m_url, 200, $blen); }
-    $modified = $post ? get_post_modified_time('c', true, $post) : gmdate('c');
-    if (function_exists('tct_record_change')) { tct_record_change($post, $c_url, $m_url, $hash, $modified); }
-    if (tct_receipts_enabled()) { tct_emit_usage_receipt($hash, 200, $blen); }
-    echo $body;
+    echo $identity->body;
     exit;
 }
 
+function tct_send_murl_identity_headers($identity, $c_url, $include_content_headers) {
+    if (!($identity instanceof \TCT\Draft03\IdentityRepresentation)) {
+        throw new InvalidArgumentException('Expected a certified identity representation.');
+    }
+
+    if (function_exists('ini_set')) {
+        @ini_set('zlib.output_compression', '0');
+    }
+
+    header('ETag: ' . $identity->etag, true);
+    $cache_control = (tct_auth_required() || tct_receipts_enabled())
+        ? 'private, no-store, no-transform'
+        : 'public, max-age=0, must-revalidate, stale-while-revalidate=60, stale-if-error=86400, no-transform';
+    header('Cache-Control: ' . $cache_control, true);
+    header('Vary: Accept-Encoding', true);
+    header('Link: <' . esc_url_raw($c_url) . '>; rel="canonical"', false);
+    header(
+        'Link: <' . \TCT\Draft03\Protocol::M_URL_PROFILE . '>; rel="profile"',
+        false
+    );
+    tct_emit_policy_links();
+
+    $policy_url = home_url('/llm-policy.json');
+    header('Link: <' . esc_url_raw($policy_url) . '>; rel="describedby"; type="application/json"', false);
+
+    if ($include_content_headers) {
+        header('Content-Type: ' . \TCT\Draft03\Protocol::CONTENT_TYPE, true);
+        header('Content-Digest: ' . $identity->contentDigest, true);
+        header('Content-Length: ' . strlen($identity->body), true);
+    }
+}
+
 function tct_build_full_payload($post, $c_url, $m_url, $hash) {
-    $modified = $post ? get_post_modified_time('c', true, $post) : gmdate('c');
-    $title = $post ? get_the_title($post) : '';
+    unset($hash);
+    $post_id = $post && isset($post->ID) ? (int) $post->ID : 0;
+    $is_pseudo = $post && $post_id === 0 && ($post->post_type ?? '') === 'homepage';
+    $modified = $is_pseudo
+        ? gmdate('c', strtotime((string) $post->post_modified_gmt . ' UTC'))
+        : ($post ? get_post_modified_time('c', true, $post) : gmdate('c'));
+    $title = $is_pseudo
+        ? (string) ($post->post_title ?? '')
+        : ($post ? get_the_title($post) : '');
     $wc = 0;
     $content_text = '';
     if ($post) {
-        $html_raw = apply_filters('the_content', $post->post_content);
-        if (!is_string($html_raw) || trim($html_raw) === '') {
-            $html_raw = (string) $post->post_content;
-        }
-        // Build authoritative content string and derive word count from it
+        // Saved source is deterministic; request-context rendering is not.
+        $html_raw = (string) $post->post_content;
         $content_text = tct_build_content_string($post);
         $wc = str_word_count($content_text);
     }
     // Excerpt: prefer WP excerpt cleaned; fallback to first sentence of the content text
-    $excerpt = $post ? wp_strip_all_tags(get_the_excerpt($post), true) : '';
+    $excerpt_source = $is_pseudo
+        ? (string) ($post->post_excerpt ?? '')
+        : ($post ? get_the_excerpt($post) : '');
+    $excerpt = wp_strip_all_tags($excerpt_source, true);
     if ($excerpt !== '') {
         // Remove the common WP token like "[&hellip;]" and unicode ellipsis
         $excerpt = preg_replace('/\[\s*&hellip;\s*\]/i', '', $excerpt);
-        $excerpt = str_replace(['&hellip;', 'â€¦'], '', $excerpt);
+        $excerpt = str_replace(['&hellip;', "\u{2026}"], '', $excerpt);
         $excerpt = trim($excerpt);
     }
     if (($excerpt === '' || strlen($excerpt) < 10) && $content_text !== '') {
@@ -278,7 +276,7 @@ function tct_build_full_payload($post, $c_url, $m_url, $hash) {
 
     // Author info
     $author = null;
-    if ($post) {
+    if ($post && !$is_pseudo) {
         $aid = (int) $post->post_author;
         $author = [
             'id' => $aid,
@@ -289,7 +287,7 @@ function tct_build_full_payload($post, $c_url, $m_url, $hash) {
 
     // Featured image (url + alt)
     $featured_image = null;
-    if ($post) {
+    if ($post && !$is_pseudo) {
         $thumb_id = get_post_thumbnail_id($post);
         if ($thumb_id) {
             $img = wp_get_attachment_image_src($thumb_id, 'full');
@@ -306,12 +304,29 @@ function tct_build_full_payload($post, $c_url, $m_url, $hash) {
     if ($post && is_string($html_raw) && trim($html_raw) !== '') {
         if (class_exists('DOMDocument')) {
             $doc = new DOMDocument();
-            libxml_use_internal_errors(true);
-            $doc->loadHTML('<?xml encoding="UTF-8">' . $html_raw);
-            libxml_clear_errors();
+            $previous_error_mode = libxml_use_internal_errors(true);
+            try {
+                $loaded = $doc->loadHTML(
+                    '<?xml encoding="UTF-8">' . $html_raw,
+                    LIBXML_NONET | LIBXML_NOWARNING | LIBXML_NOERROR
+                );
+            } finally {
+                libxml_clear_errors();
+                libxml_use_internal_errors($previous_error_mode);
+            }
+            if (!$loaded) {
+                throw new \TCT\Draft03\SchemaException(
+                    'Saved HTML could not be parsed for deterministic extensions.'
+                );
+            }
             // Images
             $imgs = $doc->getElementsByTagName('img');
             foreach ($imgs as $imgNode) {
+                if (count($body_images) >= \TCT\Draft03\Protocol::MAX_EXTRACTED_ITEMS) {
+                    throw new \TCT\Draft03\ResourceLimitException(
+                        'In-body image count exceeds the internal Draft-03 limit.'
+                    );
+                }
                 $src = $imgNode->getAttribute('src');
                 if (!$src) continue;
                 $altAttr = $imgNode->getAttribute('alt');
@@ -329,15 +344,22 @@ function tct_build_full_payload($post, $c_url, $m_url, $hash) {
             }
             // Headings (h2-h4), optional
             $include_headings = (int) get_option('tct_include_headings', 1) === 1;
-            if ($include_headings) {
-                foreach (['h2' => 2, 'h3' => 3, 'h4' => 4] as $tag => $lvl) {
-                    $nodes = $doc->getElementsByTagName($tag);
-                    foreach ($nodes as $n) {
-                        $text = trim($n->textContent);
-                        if ($text === '') continue;
-                        $id = $n->getAttribute('id');
-                        $headings[] = [ 'level' => $lvl, 'text' => $text, 'anchor' => ($id !== '' ? ('#' . $id) : null) ];
+            if ($include_headings && class_exists('DOMXPath')) {
+                $xpath = new DOMXPath($doc);
+                foreach ($xpath->query('//h2 | //h3 | //h4') as $n) {
+                    if (count($headings) >= \TCT\Draft03\Protocol::MAX_EXTRACTED_ITEMS) {
+                        throw new \TCT\Draft03\ResourceLimitException(
+                            'Heading count exceeds the internal Draft-03 limit.'
+                        );
                     }
+                    $text = trim($n->textContent);
+                    if ($text === '') continue;
+                    $id = $n->getAttribute('id');
+                    $headings[] = [
+                        'level' => (int) substr(strtolower($n->nodeName), 1),
+                        'text' => $text,
+                        'anchor' => ($id !== '' ? ('#' . $id) : null),
+                    ];
                 }
             }
         }
@@ -348,6 +370,12 @@ function tct_build_full_payload($post, $c_url, $m_url, $hash) {
     if ($post && $post->post_type !== 'homepage') {
         $cats = get_the_category($post->ID);
         if (is_array($cats) && !empty($cats)) {
+            usort($cats, static fn($left, $right) => $left->term_id <=> $right->term_id);
+            if (count($cats) > \TCT\Draft03\Protocol::MAX_EXTRACTED_ITEMS) {
+                throw new \TCT\Draft03\ResourceLimitException(
+                    'Category count exceeds the internal Draft-03 limit.'
+                );
+            }
             $categories = [];
             foreach ($cats as $c) {
                 if (!($c instanceof WP_Term)) continue;
@@ -366,6 +394,12 @@ function tct_build_full_payload($post, $c_url, $m_url, $hash) {
     if ($post && $post->post_type !== 'homepage') {
         $tags = get_the_tags($post->ID);
         if (is_array($tags) && !empty($tags)) {
+            usort($tags, static fn($left, $right) => $left->term_id <=> $right->term_id);
+            if (count($tags) > \TCT\Draft03\Protocol::MAX_EXTRACTED_ITEMS) {
+                throw new \TCT\Draft03\ResourceLimitException(
+                    'Tag count exceeds the internal Draft-03 limit.'
+                );
+            }
             $tagsArr = [];
             foreach ($tags as $t) {
                 if (!($t instanceof WP_Term)) continue;
@@ -380,7 +414,9 @@ function tct_build_full_payload($post, $c_url, $m_url, $hash) {
     }
 
     // Published date (UTC, ISO 8601) if available
-    $published = $post ? get_post_time('c', true, $post) : null;
+    $published = $is_pseudo
+        ? gmdate('c', strtotime((string) $post->post_date_gmt . ' UTC'))
+        : ($post ? get_post_time('c', true, $post) : null);
     $slug = $post ? $post->post_name : null;
 
     // Per draft-03: content_media_type specifies content format
@@ -389,13 +425,13 @@ function tct_build_full_payload($post, $c_url, $m_url, $hash) {
     $content_media_type = apply_filters('tct_content_media_type', 'text/plain; charset=utf-8', $post);
 
     $payload = [
-        'profile' => 'tct-1',
+        'profile' => \TCT\Draft03\Protocol::M_URL_PROFILE,
         'llm_url' => $m_url,
         'canonical_url' => $c_url,
-        'post_id' => $post ? intval($post->ID) : null,
+        'post_id' => $post ? $post_id : null,
         'post_type' => $post ? $post->post_type : null,
         'title' => $title,
-        'content_media_type' => $content_media_type,  // Per draft-03: NEW REQUIRED FIELD
+        'content_media_type' => $content_media_type,
         'lastModified' => $modified,
         'published' => $published,
         'word_count' => $wc,
@@ -428,24 +464,25 @@ function tct_build_full_payload($post, $c_url, $m_url, $hash) {
 function tct_create_homepage_pseudo_post() {
     $site_name = get_bloginfo('name');
     $site_desc = get_bloginfo('description');
-    $sitemap_url = home_url('/llm-sitemap.json');
+    $sitemap_url = home_url((string) get_option('tct_sitemap_path', '/llm-sitemap.json'));
 
     // Build STATIC homepage content
     // REMOVED: Dynamic recent posts (get_posts() loop) to ensure stable hash
     // Per expert review: Homepage M-URL must have stable content for ETag parity
     // Dynamic "latest 5 posts" caused cache drift (sitemap cached at T1, M-URL at T2)
-    $content = "{$site_name}\n\n";
+    $content = '';
     if ($site_desc) {
         $content .= "{$site_desc}\n\n";
     }
 
-    $content .= "For complete content, visit the LLM sitemap: {$sitemap_url}";
+    $content .= "For complete content, visit the TCT M-Sitemap: {$sitemap_url}";
 
     // Get most recent post's modified date for stable timestamps
     // This ensures homepage hash is stable until actual content changes
     $recent_post = get_posts([
         'posts_per_page' => 1,
         'post_status' => 'publish',
+        'post_type' => ['post', 'page'],
         'orderby' => 'modified',
         'order' => 'DESC',
         'fields' => 'ids',

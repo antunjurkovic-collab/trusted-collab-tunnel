@@ -1,80 +1,115 @@
-﻿# Trusted Collaboration Tunnel (TCT) — Draft-03 Alpha WordPress Reference
+# Trusted Collaboration Tunnel — Internal Draft-03 Reference
 
-**Version: 3.0.0-alpha.1** | **Target specification: draft-jurkovikj-collab-tunnel-03 internal**
+Version `3.0.0-alpha.2` is a private, non-stable WordPress reference
+implementation for the unpublished Collaboration Content Transfer Draft-03.
+It is not a production release and is not the older remotely published
+Draft-02 plugin.
 
-This branch is a draft-03 alignment workspace for the WordPress TCT reference plugin. It is not the published draft-02 implementation and should not be described as production-grade yet.
+The immutable alpha.1 reconstruction is tagged
+`tct-wordpress-v3.0.0-alpha.1-internal`. Alpha.2 is additive and follows the
+newer, substantially reworked internal Draft-03 baseline pinned in
+[`docs/DRAFT03_INTERNAL_BASELINE.md`](docs/DRAFT03_INTERNAL_BASELINE.md).
 
-TCT, in draft-03 wording, means **Collaboration Content Transfer**. Earlier deployments used "Trusted Collaboration Tunnel" / "Collaboration Tunnel" naming. This plugin keeps the historical plugin name while aligning the wire surface toward draft-03.
+## Core Surface
 
-## Core Draft-03 Surface
+- Generic M-Sitemap discovery from the origin root using
+  `Link: rel="index"; type="application/json"`.
+- HTTP and HTML `rel="alternate"` discovery from an exposable C-URL.
+- M-URL `rel="canonical"` and exact revision-specific `rel="profile"` links.
+- Exact URI-valued JSON profiles for M-URLs and M-Sitemaps.
+- M-Sitemap format version `2`.
+- RFC 8785 JCS identity response bytes.
+- Strong `"sha256-<64-lowercase-hex>"` ETags computed over those exact bytes.
+- `Content-Digest` for identity `200` responses.
+- RFC 9110 weak comparison for `If-None-Match`, including lists and wildcard.
+- Consistent `GET`, `HEAD`, `304`, `405`, and identity-negotiation behavior.
+- Catalog ETag hints derived from the same current/cached M-URL identity bytes.
 
-Core TCT features in this branch:
+The pure protocol foundation is isolated under `src/Draft03/`. WordPress
+extraction, routing, exposure policy, caching, and headers remain adapters
+under `includes/`.
 
-- C-URL to M-URL mapping for selected WordPress content.
-- M-URL JSON envelopes with `profile: "tct-1"`.
-- Strong HTTP `ETag` values derived from deterministic canonical JSON bytes.
-- M-URL response bodies emitted using the same deterministic JSON bytes used for ETag hashing.
-- `Content-Digest` integrity headers on 200 M-URL responses.
-- `Link: rel="canonical"` from M-URL back to C-URL.
-- Root discovery Link header with `profile="tct-1"`.
-- M-Sitemap at `/llm-sitemap.json` with version `2`, `profile`, `cUrl`, `mUrl`, `etag`, and `lastModified`.
-- Conditional `GET` with `If-None-Match` and `304 Not Modified`.
+## Deliberate Boundaries
 
-## Non-Core Extensions
+- M-Sitemap Index is not implemented. A catalog above the configured item or
+  byte ceiling fails closed with `503` rather than becoming unbounded.
+- Only published, publicly viewable, non-password-protected singular content
+  passes the default exposure policy. Products, attachments, the posts archive
+  placeholder, and the WooCommerce shop placeholder are excluded by default.
+- Access-control plugins can impose stronger rules with
+  `tct_post_is_exposable`; they must do so before this alpha is used on a
+  protected site.
+- The plugin serves identity bytes only. It rejects a request that explicitly
+  forbids the identity coding and sets `Vary: Accept-Encoding` plus
+  `no-transform`.
+- Canonicalization is bounded by depth, node, key, string, and total identity
+  bytes. Sitemap queries and item counts are bounded independently.
+- PHP 8.1 and WordPress 6.0 are the declared internal floors. A disposable
+  WordPress integration matrix is still required before public support is
+  claimed.
 
-These features are deployment extensions, not core TCT conformance requirements:
+## Non-Core Experiments
 
-- `/llm-policy.json`
-- `AI-Usage-Receipt` headers
-- `/llm-stats.json`
-- `/llm-changes.json`
-- `/llms.txt`
-- admin cache/status utilities
+Policy descriptors, usage receipts, statistics, change feeds, `llms.txt`,
+manifest, cache administration, and shortcodes are deployment experiments.
+They do not establish TCT conformance, authorization, licensing, publisher
+intent, or enforceable policy. Request-time statistics, write-path change
+records, and receipt emission are disabled by default.
 
-Stats and change-feed DB writes are disabled by default in this branch through:
+Receipts require a runtime `TCT_RECEIPT_HMAC_KEY` of at least 32 bytes. API
+keys can be supplied at runtime through comma-separated `TCT_API_KEYS`, or
+entered once in the internal admin UI and persisted only as SHA-256 digests.
+Legacy alpha.1 plaintext option values are not consulted.
 
-- `tct_stats_enabled = 0`
-- `tct_changes_enabled = 0`
+## Representation Transformation
 
-Receipts are disabled by default and sanitize `X-AI-Contract` to a narrow header-safe identifier grammar before emitting receipt headers.
+The WordPress adapter reads saved post source rather than request-context
+theme rendering. It recursively follows Gutenberg `innerContent` child
+placement, includes Classic/freeform markup, strips HTML tags, decodes HTML
+entities, inserts logical line boundaries for block markup, and preserves case
+and meaningful internal whitespace. The resulting publisher-selected
+plain-text value includes the title, a blank line, and the extracted body.
+Unresolved dynamic blocks contribute no text unless a deployment supplies the
+deterministic `tct_resolve_dynamic_block_text` filter.
 
-## Draft-03 Alignment Notes
+This transformation is intentionally part of the selected M-URL
+representation; TCT itself does not claim it is lossless.
 
-This branch intentionally differs from the draft-02 plugin surface:
+## Validation
 
-- Sitemap advisory timestamp field is `lastModified`, not `modified`.
-- Legacy `contentHash` and body `hash` fields are not emitted.
-- Root discovery includes `profile="tct-1"`.
-- Policy, receipt, stats, and changes are explicitly non-core extensions.
-- Broad `/llm/` substring 404 suppression was narrowed to exact TCT route shapes.
+Development dependencies are test-only:
 
-## Current Status
+```powershell
+composer install
+composer test
+& ./scripts/validate-draft03-static.ps1
+```
 
-This is an alpha alignment branch. Before a public draft-03 release, still validate:
+The unit suite includes the complete finite and nonfinite RFC 8785 Appendix B
+number table, exact IEEE-754 inputs, UTF-16 key ordering, deterministic Node
+`JSON.stringify` parity probes, Draft-03 Appendix C identity evidence,
+conditional-request parsing, schema rejection, resource boundaries,
+Gutenberg recursion, exposure policy, and hashed key behavior.
 
-- live install behavior;
-- canonical JSON byte / ETag parity;
-- sitemap field shape;
-- 200/304 behavior;
-- extension-off default behavior;
-- receipt header escaping;
-- large-site sitemap/index strategy.
+Run the live validator only against a disposable installation:
 
-## Install
+```powershell
+& ./scripts/validate-live.ps1 -BaseUrl 'https://disposable.example'
+```
 
-Copy the plugin folder to `wp-content/plugins/` and activate it in WordPress admin.
+After a clean commit, `scripts/build-package.ps1` creates two independently
+assembled ZIPs with fixed entry metadata, requires byte identity, retains one
+artifact, and writes its SHA-256 sidecar. The ZIP contains a source/draft/file
+digest manifest.
 
-Default endpoints:
+## Installation
+
+Copy the runtime package to `wp-content/plugins/trusted-collab-tunnel/` and
+activate it. Default core resources are:
 
 - `/llm-sitemap.json`
 - `/{canonical}/llm/`
-- `/llm-policy.json` extension
-- `/llms.txt` extension
 
-## Security Notes
-
-- Public mode is intended only for public content.
-- If a C-URL requires authentication, protect its corresponding M-URL similarly.
-- Treat policy, receipt, stats, and changes endpoints as deployment extensions.
-- Do not place secrets in repository files.
-- Use HTTPS for M-URLs and M-Sitemaps.
+Do not publish alpha.2 or describe it as conforming to a published `-03`
+revision until the exact pinned draft text is submitted without a
+wire-affecting change and the disposable integration evidence is green.

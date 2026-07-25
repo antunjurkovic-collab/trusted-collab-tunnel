@@ -1,25 +1,61 @@
 <?php
 if (!defined('ABSPATH')) { exit; }
 
-function tct_output_html_alternate_link() {
-    // Only on front page or singular content
-    if (!(is_front_page() || is_singular())) return;
-    $endpoint = trim(get_option('tct_endpoint_slug', 'llm'));
-
-    // Per draft-03: Add M-Sitemap discovery link on homepage
+/**
+ * Resolve the exposable post represented by the current human-facing page.
+ */
+function tct_current_c_url_post() {
     if (is_front_page()) {
-        $sitemap_path = get_option('tct_sitemap_path', '/llm-sitemap.json');
-        $sitemap_url = home_url($sitemap_path);
-        echo '<link rel="index" type="application/json" href="' . esc_url($sitemap_url) . '" title="TCT M-Sitemap" />' . "\n";
+        return tct_protocol_homepage_post();
     }
 
-    if (is_front_page()) {
-        $c = home_url('/');
-    } else {
-        $c = get_permalink();
-        if (!$c) return;
+    if (!is_singular()) {
+        return null;
     }
-    $m = trailingslashit($c) . trailingslashit($endpoint);
-    echo '<link rel="alternate" type="application/json" href="' . esc_url($m) . '" title="LLM Semantic Document - AI-Optimized Content" />' . "\n";
+
+    $post = get_queried_object();
+    return $post && tct_post_is_exposable($post) ? $post : null;
 }
 
+function tct_output_html_alternate_link() {
+    if (is_front_page()) {
+        $sitemap_path = (string) get_option('tct_sitemap_path', '/llm-sitemap.json');
+        echo '<link rel="index" type="application/json" href="'
+            . esc_url(home_url($sitemap_path))
+            . '">' . "\n";
+    }
+
+    $post = tct_current_c_url_post();
+    if (!$post) {
+        return;
+    }
+    $c_url = tct_c_url_for_post($post);
+    if (!is_string($c_url) || $c_url === '') {
+        return;
+    }
+
+    echo '<link rel="alternate" type="application/json" href="'
+        . esc_url(tct_m_url_for_c_url($c_url))
+        . '">' . "\n";
+}
+
+/**
+ * C-URL to M-URL discovery is preferably exposed in the HTTP Link field.
+ */
+function tct_add_c_url_alternate_header() {
+    $post = tct_current_c_url_post();
+    if (!$post) {
+        return;
+    }
+    $c_url = tct_c_url_for_post($post);
+    if (!is_string($c_url) || $c_url === '') {
+        return;
+    }
+
+    header(
+        'Link: <' . esc_url_raw(tct_m_url_for_c_url($c_url))
+        . '>; rel="alternate"; type="application/json"',
+        false
+    );
+}
+add_action('send_headers', 'tct_add_c_url_alternate_header');

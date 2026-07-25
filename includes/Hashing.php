@@ -2,254 +2,250 @@
 if (!defined('ABSPATH')) { exit; }
 
 /**
- * Build the authoritative content string from the CMS (theme-independent).
- * Default: Title + blank line + body text (no HTML), UTF-8 plain text.
- * Filter 'tct_build_content_string' allows adding media text in deterministic order.
- *
- * PHASE 1.5: Uses parse_blocks() DIRECTLY - skips apply_filters('the_content')
- * Benefits:
- * - More stable: theme/template changes won't affect semantic content
- * - Much faster: no shortcodes, embeds, or heavy filters
- * - Better for AI: semantic content, not pixel output
+ * Return the stable C-URL represented by a WordPress post.
  */
-function tct_build_content_string($post) {
-    $title = get_the_title($post);
+function tct_c_url_for_post($post) {
+    $post_id = is_object($post) && isset($post->ID) ? (int) $post->ID : 0;
+    if ($post_id === 0 || $post_id === (int) get_option('page_on_front', 0)) {
+        return trailingslashit(home_url('/'));
+    }
 
-    // Use parse_blocks DIRECTLY - skip apply_filters('the_content')
-    $blocks = parse_blocks($post->post_content ?? '');
-    $body_parts = [];
+    $permalink = get_permalink($post_id);
+    return is_string($permalink) && $permalink !== '' ? $permalink : null;
+}
 
-    foreach ($blocks as $block) {
-        // Skip empty/whitespace blocks
-        if (empty($block['blockName'])) {
-            continue;
-        }
+/**
+ * Map a C-URL to the configured M-URL without depending on request spelling.
+ */
+function tct_m_url_for_c_url($c_url) {
+    $endpoint = sanitize_title((string) get_option('tct_endpoint_slug', 'llm'));
+    if ($endpoint === '') {
+        $endpoint = 'llm';
+    }
 
-        // Extract text from innerHTML
-        if (!empty($block['innerHTML'])) {
-            $text = wp_strip_all_tags($block['innerHTML'], true);
-            $text = trim($text);
-            if ($text !== '') {
-                $body_parts[] = $text;
-            }
-        }
+    return trailingslashit((string) $c_url) . $endpoint . '/';
+}
 
-        // Handle nested blocks
-        if (!empty($block['innerBlocks']) && is_array($block['innerBlocks'])) {
-            foreach ($block['innerBlocks'] as $inner) {
-                if (!empty($inner['innerHTML'])) {
-                    $text = wp_strip_all_tags($inner['innerHTML'], true);
-                    $text = trim($text);
-                    if ($text !== '') {
-                        $body_parts[] = $text;
+/**
+ * Convert one parsed WordPress block subtree to deterministic plain-text parts.
+ *
+ * innerContent preserves the placement of child blocks. Null entries are
+ * replaced by recursively extracted children, preventing shallow traversal
+ * loss and parent/child duplication.
+ *
+ * @param array<string, mixed> $block Parsed block.
+ * @return string[]
+ */
+function tct_extract_block_text_parts($block, $depth = 0, &$nodes = null) {
+    if (!is_array($block)) {
+        return [];
+    }
+
+    if ($nodes === null) {
+        $nodes = 0;
+    }
+    if ($depth > \TCT\Draft03\Protocol::MAX_JSON_DEPTH) {
+        throw new \TCT\Draft03\ResourceLimitException(
+            'WordPress block nesting exceeds the internal Draft-03 limit.'
+        );
+    }
+    ++$nodes;
+    if ($nodes > \TCT\Draft03\Protocol::MAX_JSON_NODES) {
+        throw new \TCT\Draft03\ResourceLimitException(
+            'WordPress block count exceeds the internal Draft-03 limit.'
+        );
+    }
+
+    $parts = [];
+    $children = isset($block['innerBlocks']) && is_array($block['innerBlocks'])
+        ? array_values($block['innerBlocks'])
+        : [];
+    $child_index = 0;
+
+    if (isset($block['innerContent']) && is_array($block['innerContent'])) {
+        foreach ($block['innerContent'] as $fragment) {
+            if ($fragment === null) {
+                if (isset($children[$child_index])) {
+                    foreach (
+                        tct_extract_block_text_parts(
+                            $children[$child_index],
+                            $depth + 1,
+                            $nodes
+                        ) as $child_part
+                    ) {
+                        $parts[] = $child_part;
                     }
                 }
+                ++$child_index;
+                continue;
             }
+
+            if (is_string($fragment)) {
+                $text = tct_plain_text_fragment($fragment);
+                if ($text !== '') {
+                    $parts[] = $text;
+                }
+            }
+        }
+    } elseif (isset($block['innerHTML']) && is_string($block['innerHTML'])) {
+        $text = tct_plain_text_fragment($block['innerHTML']);
+        if ($text !== '') {
+            $parts[] = $text;
+        }
+    }
+
+    while (isset($children[$child_index])) {
+        foreach (
+            tct_extract_block_text_parts(
+                $children[$child_index],
+                $depth + 1,
+                $nodes
+            ) as $child_part
+        ) {
+            $parts[] = $child_part;
+        }
+        ++$child_index;
+    }
+
+    if ($parts === [] && !empty($block['blockName'])) {
+        $resolved = apply_filters('tct_resolve_dynamic_block_text', '', $block);
+        if (is_string($resolved) && trim($resolved) !== '') {
+            $parts[] = trim($resolved);
+        }
+    }
+
+    return $parts;
+}
+
+/**
+ * Strip saved markup without case folding, Unicode normalization, or internal
+ * whitespace collapse.
+ */
+function tct_plain_text_fragment($fragment) {
+    $fragment = preg_replace('/<br\s*\/?>/i', "\n", (string) $fragment);
+    $fragment = preg_replace(
+        '/<\/(?:address|article|aside|blockquote|div|figcaption|figure|footer|h[1-6]|header|li|main|nav|p|pre|section|td|th|tr)>/i',
+        "\n",
+        (string) $fragment
+    );
+    $text = wp_strip_all_tags((string) $fragment, false);
+    $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    return trim($text);
+}
+
+/**
+ * Build the documented publisher-selected plain-text representation.
+ *
+ * The transformation reads saved source directly, strips markup, decodes HTML
+ * entities, preserves case and meaningful internal whitespace, traverses
+ * Gutenberg blocks recursively, and includes Classic/freeform HTML.
+ */
+function tct_build_content_string($post) {
+    $post_id = is_object($post) && isset($post->ID) ? (int) $post->ID : 0;
+    $title = $post_id > 0
+        ? (string) get_the_title($post)
+        : (string) ($post->post_title ?? '');
+    $source = isset($post->post_content) ? (string) $post->post_content : '';
+    if (strlen($source) > \TCT\Draft03\Protocol::MAX_SOURCE_BYTES) {
+        throw new \TCT\Draft03\ResourceLimitException(
+            'Saved WordPress source exceeds the internal Draft-03 byte limit.'
+        );
+    }
+    $blocks = parse_blocks($source);
+    $body_parts = [];
+    $nodes = 0;
+
+    foreach ((array) $blocks as $block) {
+        foreach (tct_extract_block_text_parts($block, 0, $nodes) as $block_part) {
+            $body_parts[] = $block_part;
         }
     }
 
     $body_text = implode("\n\n", $body_parts);
-
-    // Combine title + body
-    $content = '';
-    if ($title !== '') {
-        $content .= $title . "\n\n";
+    $content = $title;
+    if ($title !== '' && $body_text !== '') {
+        $content .= "\n\n";
     }
     $content .= $body_text;
 
-    /**
-     * Filter: tct_build_content_string
-     * Modify or extend the constructed content string (e.g., include media captions/alt text).
-     */
     return apply_filters('tct_build_content_string', $content, $post, $title, $body_text);
 }
 
 /**
- * Minimal normalization over a plain-text content string.
- * Steps: decode entities, NFKC, casefold, remove Cc, collapse ASCII whitespace, trim.
- */
-function tct_normalize_text($text) {
-    $text = (string) $text;
-    // Step 1: Decode entities
-    $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-    // Step 2: NFKC normalization (if intl Normalizer available)
-    if (class_exists('Normalizer')) {
-        $text = Normalizer::normalize($text, Normalizer::NFKC);
-    }
-    // Step 3: Unicode case folding
-    if (function_exists('mb_convert_case')) {
-        $text = mb_convert_case($text, MB_CASE_FOLD, 'UTF-8');
-    } else {
-        $text = strtolower($text);
-    }
-    // Step 4: Remove control characters (Unicode category Cc)
-    $text = preg_replace('/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\x9F]/u', '', $text);
-    // Step 5: Collapse ASCII whitespace (space, tab, LF, FF, CR)
-    $text = preg_replace('/[ \t\n\r\f]+/u', ' ', $text);
-    // Step 6: Trim
-    $text = trim($text);
-
-    /**
-     * Filter: tct_normalize_text
-     * Allow sites to customize normalization pipeline.
-     */
-    return apply_filters('tct_normalize_text', $text);
-}
-
-/**
- * Compute sha256-<hex> fingerprint from normalized text.
- * @deprecated Use tct_compute_hash_from_json() for draft-01 compliance
- */
-function tct_compute_fingerprint($normalized_text) {
-    $hex = hash('sha256', (string)$normalized_text);
-    return 'sha256-' . $hex;
-}
-
-/**
- * Canonical JSON serialization with sorted keys at ALL levels.
+ * Encode a complete JSON value as RFC 8785 JCS.
  *
- * This is a simplified RFC8785-style canonicalization that ensures:
- * - Keys sorted lexicographically at every nesting level
- * - No whitespace
- * - Consistent encoding
- *
- * This prevents hash drift when field insertion order changes or
- * when running on different PHP versions.
- *
- * @param mixed $data The data to canonicalize
- * @return mixed Canonicalized data (arrays have sorted keys)
- */
-function tct_canonicalize_json($data) {
-    if (is_array($data)) {
-        // Check if associative array (object)
-        $is_assoc = array_keys($data) !== range(0, count($data) - 1);
-
-        if ($is_assoc) {
-            // Associative: sort keys lexicographically
-            ksort($data);
-            $result = [];
-            foreach ($data as $key => $value) {
-                $result[$key] = tct_canonicalize_json($value);
-            }
-            return $result;
-        } else {
-            // Indexed array: preserve order but recurse into values
-            $result = [];
-            foreach ($data as $value) {
-                $result[] = tct_canonicalize_json($value);
-            }
-            return $result;
-        }
-    }
-
-    // For non-arrays (strings, numbers, booleans, null), return as-is
-    return $data;
-}
-
-/**
- * Encode payload using the deterministic JSON bytes used for TCT validators.
- *
- * This is a pragmatic PHP implementation of the draft-03 requirement that the
- * same canonical JSON bytes are used for both the M-URL response body and the
- * strong ETag computation. It sorts object keys at every level and emits JSON
- * without insignificant whitespace.
- *
- * @param array $payload Associative array (WITHOUT 'hash' field)
- * @return string Canonical JSON bytes, or an empty JSON object on failure
+ * Failures are typed and fail closed; no substitute JSON value is returned.
  */
 function tct_canonical_json_encode($payload) {
-    $clean = is_array($payload) ? $payload : [];
-    unset($clean['hash']);
-
-    $canonical_data = tct_canonicalize_json($clean);
-    $canonical = wp_json_encode($canonical_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-
-    if ($canonical === false) {
-        $canonical = wp_json_encode($canonical_data, JSON_UNESCAPED_SLASHES);
-    }
-
-    return $canonical === false ? '{}' : $canonical;
+    return (new \TCT\Draft03\JcsEncoder())->encode($payload);
 }
 
 /**
- * Compute SHA-256 hash from canonical JSON bytes.
- *
- * Per draft-jurkovikj-collab-tunnel-03:
- * 1. Build payload object WITHOUT hash field
- * 2. Canonicalize to UTF-8 bytes
- * 3. Compute SHA-256
- * 4. Return as "sha256-<64hex>"
- *
- * @param array $payload Associative array (WITHOUT 'hash' field)
- * @return string Hash in format "sha256-<hex>"
+ * Compute the Draft-03 catalog form of the JCS identity ETag.
  */
 function tct_compute_hash_from_json($payload) {
-    return 'sha256-' . hash('sha256', tct_canonical_json_encode($payload));
+    return \TCT\Draft03\IdentityRepresentation::fromValue($payload)->catalogEtag();
 }
 
 /**
- * Build final TCT payload and hash for a given post + URLs.
+ * Certify a final M-URL payload and derive its exact identity representation.
  *
- * This is the SINGLE SOURCE OF TRUTH used by:
- * - M-URL endpoint responses (tct_output_llm_endpoint)
- * - M-Sitemap etag values (tct_output_sitemap)
- *
- * Ensures:
- * - Identical canonicalization and hashing in both places
- * - Sitemap etag == M-URL ETag (sans quotes)
- * - 100% triple parity: sitemap etag == HTTP ETag == payload hash
- *
- * Per expert review: "Both sitemap and M-URL must derive from the
- * same canonicalization/hashing pipeline."
- *
- * @param WP_Post|object|null $post WordPress post object
- * @param string $c_url Canonical URL (with trailing slash)
- * @param string $m_url M-URL (with trailing slash)
- * @return array [payload (array), hash (string "sha256-...")]
+ * @param array<string, mixed> $payload
  */
-function tct_build_tct_payload_and_hash($post, $c_url, $m_url) {
-    // 1. Base payload without hash
+function tct_certify_murl_identity($payload) {
+    $document = \TCT\Draft03\MUrlDocument::fromArray($payload);
+    return \TCT\Draft03\IdentityRepresentation::fromValue($document);
+}
+
+/**
+ * @return array{0: array<string, mixed>, 1: \TCT\Draft03\IdentityRepresentation}
+ */
+function tct_build_murl_identity($post, $c_url, $m_url) {
+    $payload = tct_build_tct_payload($post, $c_url, $m_url);
+    return [$payload, tct_certify_murl_identity($payload)];
+}
+
+/**
+ * Build the final M-URL payload.
+ *
+ * The tct_build_payload filter remains available for deterministic extensions.
+ * Its final result must retain all required Draft-03 members and must satisfy
+ * the JCS/I-JSON domain.
+ *
+ * @return array<string, mixed>
+ */
+function tct_build_tct_payload($post, $c_url, $m_url) {
     $full = tct_build_full_payload($post, $c_url, $m_url, null);
-
-    // 2. Initial hash from canonical JSON of base payload
-    $hash = tct_compute_hash_from_json($full);
-    // NOTE: Per draft-03, DO NOT add 'hash' to payload (ETag header only)
-
-    // 3. Allow an external provider to override or extend
-    $payload = null;
     $filtered = apply_filters('tct_build_payload', null, $post, $c_url, $m_url);
 
-    if (is_array($filtered) && isset($filtered['payload'])) {
-        // Fully provided payload. Draft-03 requires the ETag to be derived from
-        // the final representation bytes, so ignore caller-provided hashes.
+    if (is_array($filtered) && isset($filtered['payload']) && is_array($filtered['payload'])) {
         $payload = $filtered['payload'];
-        $hash = tct_compute_hash_from_json($payload);
     } elseif (is_array($filtered)) {
-        // Partial override: merge with our full payload
         $payload = $filtered;
-
-        // Fill in missing core fields from our base payload
-        if (!isset($payload['content']) || $payload['content'] === '' || $payload['content'] === null) {
-            $payload['content'] = $full['content'];
+        foreach ($full as $member => $value) {
+            if (!array_key_exists($member, $payload)) {
+                $payload[$member] = $value;
+            }
         }
-        if (!isset($payload['excerpt']) || $payload['excerpt'] === '' || $payload['excerpt'] === null) {
-            $payload['excerpt'] = $full['excerpt'];
-        }
-        if (!isset($payload['word_count']) || !is_int($payload['word_count'])) {
-            $payload['word_count'] = $full['word_count'];
-        }
-
-        $payload['llm_url'] = $payload['llm_url'] ?? $m_url;
-        $payload['canonical_url'] = $payload['canonical_url'] ?? $c_url;
-
-        // Recompute hash from final merged payload
-        $hash = tct_compute_hash_from_json($payload);
-        // NOTE: Per draft-03, DO NOT add 'hash' to payload (ETag header only)
     } else {
-        // No external override â†’ use our full payload
         $payload = $full;
-        // $hash already set
     }
 
-    return [$payload, $hash];
+    if (($payload['canonical_url'] ?? null) !== $c_url) {
+        throw new \TCT\Draft03\SchemaException(
+            'M-URL canonical_url must equal the emitted canonical Link target.'
+        );
+    }
+
+    return $payload;
+}
+
+/**
+ * Backward-compatible internal helper returning the certified catalog ETag.
+ *
+ * @return array{0: array<string, mixed>, 1: string}
+ */
+function tct_build_tct_payload_and_hash($post, $c_url, $m_url) {
+    [$payload, $identity] = tct_build_murl_identity($post, $c_url, $m_url);
+    return [$payload, $identity->catalogEtag()];
 }

@@ -1,11 +1,11 @@
 <?php
 /**
- * Plugin Name: Trusted Collaboration Tunnel
+ * Plugin Name: Trusted Collaboration Tunnel — Internal Draft-03 Reference
  * Plugin URI: https://llmpages.org
- * Description: AI-optimized content delivery with sitemap-first discovery, template-invariant ETags, and 304 discipline. Reduces AI crawler bandwidth by 60-90%.
- * Version: 3.0.0-alpha.1
- * Requires at least: 5.0
- * Requires PHP: 7.4
+ * Description: Internal reference implementation of the Collaboration Content Transfer Draft-03 HTTP profile.
+ * Version: 3.0.0-alpha.2
+ * Requires at least: 6.0
+ * Requires PHP: 8.1
  * Author: Antun Jurkovikj
  * Author URI: https://llmpages.org
  * License: GPL v2 or later
@@ -18,15 +18,33 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('TCT_VERSION', '3.0.0-alpha.1');
+define('TCT_VERSION', '3.0.0-alpha.2');
 define('TCT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('TCT_PLUGIN_URL', plugin_dir_url(__FILE__));
+
+spl_autoload_register(static function($class) {
+    $prefix = 'TCT\\Draft03\\';
+    if (!is_string($class) || !str_starts_with($class, $prefix)) {
+        return;
+    }
+
+    $relative = substr($class, strlen($prefix));
+    if ($relative === '' || preg_match('/^[A-Za-z0-9_\\\\]+$/D', $relative) !== 1) {
+        return;
+    }
+
+    $file = TCT_PLUGIN_DIR . 'src/Draft03/' . str_replace('\\', '/', $relative) . '.php';
+    if (is_file($file)) {
+        require_once $file;
+    }
+});
 
 require_once TCT_PLUGIN_DIR . 'includes/Hashing.php';
 require_once TCT_PLUGIN_DIR . 'includes/Policy.php';
 require_once TCT_PLUGIN_DIR . 'includes/PolicyDescriptor.php';
 require_once TCT_PLUGIN_DIR . 'includes/Auth.php';
 require_once TCT_PLUGIN_DIR . 'includes/Receipt.php';
+require_once TCT_PLUGIN_DIR . 'includes/Cache.php';
 require_once TCT_PLUGIN_DIR . 'includes/Endpoint.php';
 require_once TCT_PLUGIN_DIR . 'includes/Sitemap.php';
 require_once TCT_PLUGIN_DIR . 'includes/Manifest.php';
@@ -38,122 +56,152 @@ require_once TCT_PLUGIN_DIR . 'includes/Stats.php';
 require_once TCT_PLUGIN_DIR . 'includes/Changes.php';
 require_once TCT_PLUGIN_DIR . 'includes/Shortcodes.php';
 
-// Cache invalidation for sitemap (Phase 0: Expert-approved pattern)
-// Invalidates cache when content changes to ensure fresh sitemaps
-add_action('save_post', 'tct_invalidate_sitemap_cache');
-add_action('delete_post', 'tct_invalidate_sitemap_cache');
-add_action('trash_post', 'tct_invalidate_sitemap_cache');
-add_action('untrash_post', 'tct_invalidate_sitemap_cache');
+add_action('save_post', 'tct_refresh_post_identity', 20, 3);
+add_action('delete_post', 'tct_invalidate_post_identity');
+add_action('trashed_post', 'tct_invalidate_post_identity');
+add_action('untrashed_post', 'tct_invalidate_post_identity');
 
 /**
- * Invalidate sitemap cache when content changes.
- *
- * This ensures the sitemap reflects current site content without
- * requiring full regeneration on every request.
- *
- * @param int|null $post_id The post ID being modified
+ * Invalidate the exact post representation and every catalog that names it.
  */
-function tct_invalidate_sitemap_cache($post_id = null) {
-    // Ignore revisions and autosaves
-    if ($post_id && (wp_is_post_revision($post_id) || wp_is_post_autosave($post_id))) {
+function tct_invalidate_post_identity($post_id = null) {
+    $post_id = (int) $post_id;
+    if ($post_id > 0 && (wp_is_post_revision($post_id) || wp_is_post_autosave($post_id))) {
         return;
     }
 
-    // Clear both old and new cache versions (for smooth upgrade)
-    delete_transient('tct_sitemap_cache_v2');
-    delete_transient('tct_sitemap_cache_v3');
-    delete_transient('tct_sitemap_json_v3');
-    delete_transient('tct_sitemap_etag_v3');
-
-    // Also invalidate recent changes cache if implemented
+    if ($post_id > 0) {
+        tct_delete_cached_identity($post_id);
+    }
+    tct_delete_cached_identity(0);
+    tct_delete_cached_sitemap_identity();
     delete_transient('tct_sitemap_recent_cache_v2');
 }
 
-// PHASE 1.2: Precompute ETag + Payload on Save (wp-dual-native pattern)
-// Hook into save_post and status transitions to shift work to write path
-add_action('save_post', 'tct_precompute_etag', 10, 3);
-add_action('transition_post_status', 'tct_precompute_etag_status', 10, 3);
-
 /**
- * Precompute ETag and payload when post changes (shift work to write path)
- * Matches wp-dual-native pattern of computing CID on mutation
- *
- * @param int $post_id Post ID being saved
- * @param WP_Post $post Post object
- * @param bool $update Whether this is an update
+ * Build and cache one certified identity representation on the write path.
  */
-function tct_precompute_etag($post_id, $post, $update) {
-    // Guard against autosaves/revisions
-    if (wp_is_post_revision($post_id) || wp_is_post_autosave($post_id)) {
+function tct_refresh_post_identity($post_id, $post, $update) {
+    unset($update);
+    $post_id = (int) $post_id;
+    if ($post_id <= 0 || wp_is_post_revision($post_id) || wp_is_post_autosave($post_id)) {
         return;
     }
 
-    // Scope to relevant post types (avoid work on posts not in TCT)
-    $blocked = apply_filters('tct_block_post_types', ['product']);
-    if ($post && is_array($blocked) && in_array($post->post_type, $blocked, true)) {
-        return;
-    }
+    tct_invalidate_post_identity($post_id);
 
-    // Clear old caches
+    // Alpha.1 metadata/transients are historical implementation details and
+    // are never consulted by alpha.2.
     delete_post_meta($post_id, '_tct_etag');
     delete_transient('tct_payload_' . $post_id);
 
-    // Only precompute for published posts (skip drafts to save resources)
-    if ($post->post_status !== 'publish') {
+    if (($post->post_type ?? '') === 'attachment') {
+        tct_invalidate_protocol_generation();
         return;
     }
 
-    // Precompute new ETag + payload
-    $endpoint = trim(get_option('tct_endpoint_slug', 'llm'));
-    $c_url = get_permalink($post_id);
-    if (!$c_url) return;
+    if (!tct_post_is_exposable($post)) {
+        return;
+    }
 
-    $m_url = trailingslashit($c_url) . trailingslashit($endpoint);
+    $c_url = tct_c_url_for_post($post);
+    if (!is_string($c_url) || $c_url === '') {
+        return;
+    }
+    $m_url = tct_m_url_for_c_url($c_url);
 
-    list($payload, $hash) = tct_build_tct_payload_and_hash($post, $c_url, $m_url);
-
-    // Store for instant 200 or 304
-    update_post_meta($post_id, '_tct_etag', $hash);
-    set_transient('tct_payload_' . $post_id, $payload, WEEK_IN_SECONDS);
+    try {
+        [, $identity] = tct_build_murl_identity($post, $c_url, $m_url);
+        tct_set_cached_identity($post_id, $identity);
+        tct_record_change(
+            $post,
+            $c_url,
+            $m_url,
+            $identity->catalogEtag(),
+            get_post_modified_time('c', true, $post)
+        );
+    } catch (\Throwable $exception) {
+        error_log('TCT Draft-03 write-path build failed: ' . $exception->getMessage());
+    }
 }
 
 /**
- * Handle publish/unpublish transitions
- *
- * @param string $new_status New post status
- * @param string $old_status Old post status
- * @param WP_Post $post Post object
+ * Changes to shared representation dependencies invalidate the entire current
+ * generation without enumerating transient rows.
  */
-function tct_precompute_etag_status($new_status, $old_status, $post) {
-    // Precompute when publishing or unpublishing
-    if ($new_status === 'publish' || $old_status === 'publish') {
-        tct_precompute_etag($post->ID, $post, true);
+function tct_invalidate_protocol_generation() {
+    tct_bump_cache_epoch();
+}
+
+add_action('profile_update', 'tct_invalidate_protocol_generation');
+add_action('edited_term', 'tct_invalidate_protocol_generation');
+add_action('delete_term', 'tct_invalidate_protocol_generation');
+add_action('created_term', 'tct_invalidate_protocol_generation');
+add_action('update_option_blogname', 'tct_invalidate_protocol_generation');
+add_action('update_option_blogdescription', 'tct_invalidate_protocol_generation');
+add_action('update_option_page_on_front', 'tct_invalidate_protocol_generation');
+add_action('update_option_page_for_posts', 'tct_invalidate_protocol_generation');
+add_action('update_option_tct_endpoint_slug', 'tct_invalidate_protocol_generation');
+add_action('update_option_tct_sitemap_path', 'tct_invalidate_protocol_generation');
+add_action('update_option_tct_include_headings', 'tct_invalidate_protocol_generation');
+add_action('update_option_tct_force_full_content', 'tct_invalidate_protocol_generation');
+
+function tct_invalidate_post_term_dependency($object_id) {
+    tct_invalidate_post_identity((int) $object_id);
+}
+add_action('set_object_terms', 'tct_invalidate_post_term_dependency');
+
+function tct_invalidate_attachment_alt_dependency($meta_id, $object_id, $meta_key) {
+    unset($meta_id);
+    if ($meta_key === '_wp_attachment_image_alt') {
+        tct_invalidate_protocol_generation();
+    } elseif ($meta_key === '_thumbnail_id') {
+        tct_invalidate_post_identity((int) $object_id);
     }
 }
+add_action('added_post_meta', 'tct_invalidate_attachment_alt_dependency', 10, 3);
+add_action('updated_post_meta', 'tct_invalidate_attachment_alt_dependency', 10, 3);
+add_action('deleted_post_meta', 'tct_invalidate_attachment_alt_dependency', 10, 3);
 
 
 // CRITICAL: Prevent WordPress from setting 404 on TCT endpoints
 // Use pre_handle_404 filter (WP 5.5+) to prevent 404 before LiteSpeed Cache sees it
 add_filter('pre_handle_404', 'tct_prevent_404_on_endpoints', 10, 2);
 
+function tct_request_is_protocol_route($path) {
+    if (!is_string($path)) {
+        return false;
+    }
+
+    $path = '/' . ltrim($path, '/');
+    $singleton_paths = [
+        (string) get_option('tct_sitemap_path', '/llm-sitemap.json'),
+        (string) get_option('tct_manifest_path', '/llm-manifest.json'),
+        (string) get_option('tct_llms_path', '/llms.txt'),
+        '/llm-policy.json',
+        '/llm-stats.json',
+        '/llm-changes.json',
+    ];
+    foreach ($singleton_paths as $singleton_path) {
+        $singleton_path = (string) parse_url($singleton_path, PHP_URL_PATH);
+        if ($singleton_path !== '' && $path === '/' . ltrim($singleton_path, '/')) {
+            return true;
+        }
+    }
+
+    $endpoint = sanitize_title((string) get_option('tct_endpoint_slug', 'llm'));
+    if ($endpoint === '') {
+        $endpoint = 'llm';
+    }
+
+    return preg_match('~^/(?:.+/)?' . preg_quote($endpoint, '~') . '/?$~', $path) === 1;
+}
+
 function tct_prevent_404_on_endpoints($preempt, $wp_query) {
-    $endpoint = trim(get_option('tct_endpoint_slug', 'llm'));
+    unset($wp_query);
     $uri = $_SERVER['REQUEST_URI'] ?? '';
     $path = parse_url($uri, PHP_URL_PATH);
-    if (!is_string($path)) {
-        return $preempt;
-    }
-    $path = '/' . ltrim($path, '/');
-
-    // Check exact TCT singleton endpoints and exact M-URL patterns only.
-    $is_tct_request = (
-        in_array($path, array('/llm-sitemap.json', '/llm-policy.json', '/llm-manifest.json', '/llm-stats.json', '/llm-changes.json', '/llms.txt'), true) ||
-        preg_match('~^/' . preg_quote($endpoint, '~') . '/?$~', $path) ||
-        preg_match('~^/.+?/' . preg_quote($endpoint, '~') . '/?$~', $path)
-    );
-
-    if ($is_tct_request) {
-        // Return true to prevent WordPress from setting is_404 = true
+    if (tct_request_is_protocol_route($path)) {
         return true;
     }
 
@@ -166,20 +214,11 @@ add_action('wp', 'tct_clear_404_fallback', 5);
 function tct_clear_404_fallback() {
     global $wp_query;
     if (!isset($wp_query)) return;
-    
-    $endpoint = trim(get_option('tct_endpoint_slug', 'llm'));
+
     $uri = $_SERVER['REQUEST_URI'] ?? '';
     $path = parse_url($uri, PHP_URL_PATH);
-    if (!is_string($path)) return;
-    $path = '/' . ltrim($path, '/');
 
-    $is_tct_request = (
-        in_array($path, array('/llm-sitemap.json', '/llm-policy.json', '/llm-manifest.json', '/llm-stats.json', '/llm-changes.json', '/llms.txt'), true) ||
-        preg_match('~^/' . preg_quote($endpoint, '~') . '/?$~', $path) ||
-        preg_match('~^/.+?/' . preg_quote($endpoint, '~') . '/?$~', $path)
-    );
-
-    if ($is_tct_request && $wp_query->is_404) {
+    if (tct_request_is_protocol_route($path) && $wp_query->is_404) {
         $wp_query->is_404 = false;
         status_header(200);
     }
@@ -193,7 +232,7 @@ add_action('template_redirect', 'tct_handle_requests', 0);
 // Add HTML rel="alternate" link for pages/front page (optional but recommended)
 add_action('wp_head', 'tct_output_html_alternate_link', 5);
 
-// Add Link header on root for M-Sitemap discovery (draft-01 Section 4.1 REQUIRED)
+// Add the generic index link; the retrieved profile identifies TCT.
 add_action('send_headers', 'tct_add_root_link_header');
 
 function tct_add_root_link_header() {
@@ -205,28 +244,31 @@ function tct_add_root_link_header() {
     // Get sitemap path from settings
     $sitemap_path = get_option('tct_sitemap_path', '/llm-sitemap.json');
 
-    // Send Link header per draft-jurkovikj-collab-tunnel-01 Section 4.1
-    // MUST include: rel="index" and type="application/json"
     header(
-        'Link: <' . esc_url_raw(home_url($sitemap_path)) . '>; rel="index"; type="application/json"; profile="tct-1"',
+        'Link: <' . esc_url_raw(home_url($sitemap_path)) . '>; rel="index"; type="application/json"',
         false
     );
 }
 
-// Optional: activation defaults
-register_activation_hook(__FILE__, function() {
+function tct_activate_plugin() {
+    if (PHP_VERSION_ID < 80100 || PHP_INT_SIZE < 8 || !extension_loaded('mbstring')) {
+        wp_die(
+            esc_html(
+                'TCT alpha.2 requires 64-bit PHP 8.1 or newer with the mbstring extension.'
+            )
+        );
+    }
+
     add_option('tct_endpoint_slug', 'llm');
     add_option('tct_sitemap_path', '/llm-sitemap.json');
-    // Default manifest path moved to JSON to avoid colliding with llms.txt
     add_option('tct_manifest_path', '/llm-manifest.json');
-    // New: public path for human-readable llms.txt
     add_option('tct_llms_path', '/llms.txt');
     add_option('tct_terms_url', '');
     add_option('tct_pricing_url', '');
-    add_option('tct_auth_mode', 'off'); // off|api_key
-    add_option('tct_api_keys', []); // array of strings
+    add_option('tct_auth_mode', 'off');
+    add_option('tct_api_key_hashes', []);
+    add_option('tct_v03_cache_epoch', 1, '', false);
     add_option('tct_receipts_enabled', 0);
-    add_option('tct_receipt_hmac_key', '');
     add_option('tct_stats_enabled', 0);
     add_option('tct_changes_enabled', 0);
     add_option('tct_root_rewrite_enabled', 1);
@@ -243,34 +285,60 @@ register_activation_hook(__FILE__, function() {
     if (function_exists('tct_init_policy_defaults')) {
         tct_init_policy_defaults();
     }
-    // Ensure rewrites are registered on first activation
-    if (function_exists('flush_rewrite_rules')) { flush_rewrite_rules(); }
-});
+    tct_register_rewrite_rules();
+    flush_rewrite_rules();
+}
+register_activation_hook(__FILE__, 'tct_activate_plugin');
 
-register_deactivation_hook(__FILE__, function() {
-    // Clean rewrites on deactivation
-    if (function_exists('flush_rewrite_rules')) { flush_rewrite_rules(); }
-});
+function tct_deactivate_plugin() {
+    flush_rewrite_rules();
+}
+register_deactivation_hook(__FILE__, 'tct_deactivate_plugin');
 
-// Root /{endpoint}/ rewrite to guarantee routing across environments
-add_action('init', function() {
+/**
+ * Register configured protocol routes before activation flushes them.
+ */
+function tct_register_rewrite_rules() {
     $enabled = (int) get_option('tct_root_rewrite_enabled', 1);
     if (!$enabled) return;
-    $slug = trim(get_option('tct_endpoint_slug', 'llm'));
+    $slug = sanitize_title((string) get_option('tct_endpoint_slug', 'llm'));
     if ($slug === '') $slug = 'llm';
-    // Avoid conflict if a real Page exists at /{slug}/
-    $page = function_exists('get_page_by_path') ? get_page_by_path($slug) : null;
-    if ($page && $page instanceof WP_Post) return;
+
     add_rewrite_rule('^' . preg_quote($slug, '/') . '/?$', 'index.php?tct_llm_root=1', 'top');
 
-    // Force WordPress to handle sitemap/manifest/llms even on hosts that treat .json/.txt as static
-    add_rewrite_rule('^llm-sitemap\\.json$', 'index.php?tct_sitemap=1', 'top');
-    add_rewrite_rule('^llm-manifest\\.json$', 'index.php?tct_manifest=1', 'top');
-    add_rewrite_rule('^llms\\.txt$', 'index.php?tct_llms=1', 'top');
-    add_rewrite_rule('^llm-policy\\.json$', 'index.php?tct_policy=1', 'top');
-    add_rewrite_rule('^llm-stats\\.json$', 'index.php?tct_stats=1', 'top');
-    add_rewrite_rule('^llm-changes\\.json$', 'index.php?tct_changes=1', 'top');
-});
+    $routes = [
+        [(string) get_option('tct_sitemap_path', '/llm-sitemap.json'), 'tct_sitemap'],
+        [(string) get_option('tct_manifest_path', '/llm-manifest.json'), 'tct_manifest'],
+        [(string) get_option('tct_llms_path', '/llms.txt'), 'tct_llms'],
+        ['/llm-policy.json', 'tct_policy'],
+        ['/llm-stats.json', 'tct_stats'],
+        ['/llm-changes.json', 'tct_changes'],
+    ];
+
+    foreach ($routes as [$path, $query_var]) {
+        $path = trim((string) parse_url($path, PHP_URL_PATH), '/');
+        if ($path !== '') {
+            add_rewrite_rule(
+                '^' . preg_quote($path, '/') . '$',
+                'index.php?' . $query_var . '=1',
+                'top'
+            );
+        }
+    }
+}
+add_action('init', 'tct_register_rewrite_rules');
+
+function tct_flush_rewrites_after_setting_change($old_value, $new_value) {
+    if ($old_value === $new_value) {
+        return;
+    }
+    tct_register_rewrite_rules();
+    flush_rewrite_rules();
+}
+add_action('update_option_tct_endpoint_slug', 'tct_flush_rewrites_after_setting_change', 20, 2);
+add_action('update_option_tct_sitemap_path', 'tct_flush_rewrites_after_setting_change', 20, 2);
+add_action('update_option_tct_manifest_path', 'tct_flush_rewrites_after_setting_change', 20, 2);
+add_action('update_option_tct_llms_path', 'tct_flush_rewrites_after_setting_change', 20, 2);
 
 // Allow tct_llm_root as a public query var
 add_filter('query_vars', function($vars) {
