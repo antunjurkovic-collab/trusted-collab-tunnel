@@ -34,6 +34,8 @@ function tct_handle_clear_cache() {
     // Clear all TCT caches
     delete_transient('tct_sitemap_cache_v2');
     delete_transient('tct_sitemap_cache_v3');
+    delete_transient('tct_sitemap_json_v3');
+    delete_transient('tct_sitemap_etag_v3');
     delete_transient('tct_sitemap_recent_cache_v2');
 
     // Get cache info before clearing
@@ -43,6 +45,12 @@ function tct_handle_clear_cache() {
     }
     if (get_transient('tct_sitemap_cache_v3') === false) {
         $cleared[] = 'sitemap_v3';
+    }
+    if (get_transient('tct_sitemap_json_v3') === false) {
+        $cleared[] = 'sitemap_json_v3';
+    }
+    if (get_transient('tct_sitemap_etag_v3') === false) {
+        $cleared[] = 'sitemap_etag_v3';
     }
 
     // Redirect back with success message

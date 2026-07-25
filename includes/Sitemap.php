@@ -77,6 +77,11 @@ function tct_output_sitemap() {
         // The posts page behaves as an archive, not as a singular content M-URL.
         $post_not_in[] = $posts_page_id;
     }
+    $front_page_id = (int) get_option('page_on_front');
+    if ($front_page_id > 0) {
+        // The front page is added explicitly as the first sitemap entry.
+        $post_not_in[] = $front_page_id;
+    }
 
     // PHASE 2.3: Optimize query with performance flags
     $qargs = [
