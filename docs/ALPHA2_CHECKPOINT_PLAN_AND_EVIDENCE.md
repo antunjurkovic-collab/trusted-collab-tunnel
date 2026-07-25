@@ -20,9 +20,12 @@ alpha.1, the remote Draft-02 `main`, or the unpublished Draft-03 source.
    - Pure code lives under `src/Draft03/`.
 3. Current Draft-03 WordPress adapter and package candidate — complete
    - Commit: `74a7e7ee052a254a26a8a342a9159a92b1ce182a`
-4. Disposable WordPress/PHP integration matrix — pending
-   - Required before alpha.2 can be frozen as an install-tested internal
-     reference.
+4. Disposable WordPress/PHP integration matrix — complete
+   - Live-repair commits: `b1e39da` and
+     `b295f341e909efc5c7c12fd393a59f78be793bc7`
+   - Retained package source:
+     `bfe7e8c6d2dbabe1de3ea8adf445750de406f313`
+   - Matrix completed: 2026-07-26
 5. Team review and internal alpha.2 freeze tag — pending
    - No external publication or merge to remote `main` is implied.
 
@@ -30,7 +33,7 @@ If the pinned Draft-03 source changes in a wire-affecting way, checkpoint 3 is
 not silently updated. A new alpha checkpoint and complete conformance run are
 required.
 
-## Checkpoint 3 Evidence
+## Repository Evidence
 
 Normative unpublished source:
 
@@ -45,8 +48,8 @@ Acceptance commands and results:
 
 - PHP syntax: 42 repository PHP files passed.
 - PowerShell syntax: all three validation/build scripts passed parser checks.
-- PHPUnit: 78 tests, 3,237 assertions passed.
-- Static Draft-03 gate: 30 of 30 checks passed.
+- PHPUnit: 80 tests, 3,240 assertions passed.
+- Static Draft-03 gate: 33 of 33 checks passed.
 - `composer validate --strict`: passed.
 - `composer audit --locked`: no vulnerability advisories.
 - `git diff --check`: passed.
@@ -80,7 +83,7 @@ Retained artifact:
 
 SHA-256:
 
-`3d28f75a4824b216674664d5ecad16e4ffde966b09324b14c95e6df6ec9071f3`
+`ff1c85f8630ae4b41a876a508494b2bb4338e59f66abac878081d02e3055d0dc`
 
 Archive verification:
 
@@ -88,31 +91,86 @@ Archive verification:
   manifest.
 - No `vendor/` or `tests/` entries.
 - Every manifest file byte length and SHA-256 matched its archive entry.
-- Manifest source commit and unpublished draft digest matched this checkpoint.
+- Manifest source commit was `bfe7e8c6d2dbabe1de3ea8adf445750de406f313`.
+- Manifest and independently rechecked unpublished-draft digests matched this
+  checkpoint.
 - All entry DOS date fields were `1980-01-01 00:00:00`.
 
-## Open Evidence Gate
+## Disposable Integration Evidence
 
-No live WordPress result is claimed. Two disposable validation mechanisms were
-attempted:
+Docker Desktop supplied a Linux engine. The retained ZIP was copied into,
+installed with `--force`, activated, and manifest-checked in both disposable
+lanes without a source-directory bind mount:
 
-- the exact WordPress Playground CLI installation stalled without producing a
-  runnable process;
-- Docker Desktop could not expose its engine because its WSL distribution
-  reported a failed local drive mount.
+- Minimum lane: WordPress `6.0.11`, PHP `8.1.34`, Apache, and MariaDB `10.11`.
+- Current lane: WordPress `7.0.2`, PHP `8.3.32`, Apache, and MariaDB `10.11`.
 
-Both attempts were stopped and cleaned up. This is an environment/evidence
-blocker, not evidence of a plugin failure, but it remains a real gate:
+The minimum WordPress files were populated using the official WordPress CLI
+inside the official `wordpress:php8.1-apache` runtime because no exact
+`6.0.11-php8.1-apache` image tag was available. A complete bundled
+Twenty Twenty-One theme was used after the downloaded Twenty Twenty-Two test
+fixture was found to be incomplete. Neither condition changed plugin source.
 
-- install and activate the retained package on disposable WordPress;
-- exercise pretty and plain permalink modes;
-- run PHP 8.1 and a newer supported PHP version;
-- run `scripts/validate-live.ps1`;
-- verify origin-server/CDN compression does not transform identity responses;
-- test save, term, image-alt, thumbnail, author, trash, restore, delete, and
-  option invalidation;
-- repeat on the intended minimum and current WordPress versions.
+Final retained-package live results:
 
-Only after that matrix is green should Team review create an internal alpha.2
-freeze tag. Publication still requires a separate decision after the exact
-Draft-03 text is submitted and legal/public-facing metadata is reviewed.
+- WordPress 6.0.11/PHP 8.1, pretty permalinks: 113 of 113 checks passed.
+- WordPress 6.0.11/PHP 8.1, plain permalinks: 113 of 113 checks passed.
+- WordPress 7.0.2/PHP 8.3, pretty permalinks: 113 of 113 checks passed.
+- WordPress 7.0.2/PHP 8.3, plain permalinks: 113 of 113 checks passed.
+
+Those checks covered root discovery, complete sitemap sampling, exact raw-byte
+ETag/digest/length identity, profile and canonical links, catalog hints,
+`If-None-Match` `304`, `HEAD`, `405`, identity-forbidden `406`, and advertised
+`gzip` requests. The origin returned no `Content-Encoding`; the raw body,
+strong ETag, digest, and length remained the identity values and responses
+carried `Vary: Accept-Encoding` and `no-transform`.
+
+Gutenberg nested-block, Classic markup, non-ASCII, attachment, category, term,
+author, thumbnail, and image-alt fixtures were exercised. The complete
+write-path invalidation matrix passed in both lanes against the pre-commit
+candidate of the runtime later frozen at `b295f34`; no write-path logic changed
+afterward. It proved:
+
+- save and category assignment changed the M-URL and sitemap identities;
+- thumbnail removal/restoration and attachment alt-text edits changed both;
+- author display-name and term edits changed both;
+- a relevant site-option edit incremented the cache epoch exactly once and
+  changed the homepage identity;
+- trash removed the item and returned `404`, restore returned `200` and
+  restored the exact current hint, and permanent deletion removed it again.
+
+WordPress 6.0 itself emits PHP 8.1 deprecation diagnostics from its legacy
+Requests classes when diagnostics are forcibly displayed. The machine-route
+guard prevented those bytes from contaminating a first fresh-worker machine
+response. The final matrix retained `WP_DEBUG` and diagnostic logging but set
+`WP_DEBUG_DISPLAY` to false, which also kept unrelated core diagnostics from
+prematurely committing ordinary HTML headers. Eight repeated fresh-worker
+minimum-lane root-discovery probes then passed.
+
+## Live Repairs Confirmed by the Matrix
+
+- WordPress `wp_magic_quotes()` slashes quoted request headers, so
+  `If-None-Match` is now unslashed before the shared parser sees it.
+- Plain-permalink C-URLs now map to
+  `?p=<id>&tct_m_url=1` or `?page_id=<id>&tct_m_url=1` instead of appending a
+  path suffix after a query string.
+- Permalink-structure changes bump the Draft-03 cache epoch.
+- Root and C-URL discovery headers run after WordPress query state exists and
+  are suppressed on protocol-resource responses.
+- The live validator hashes and decodes the original response bytes rather
+  than a reconstructed .NET string.
+
+## Remaining Gates
+
+The disposable integration gate is closed. Alpha.2 is ready for Team review,
+but no alpha.2 tag has been created by this checkpoint.
+
+No actual CDN was selected or deployed. CDN/proxy transformation validation is
+therefore a deployment-specific gate, not a claimed result of this disposable
+origin matrix.
+
+Publication remains separately gated on submitting the exact pinned Draft-03
+text without a wire-affecting change, reviewing legal and public-facing
+metadata, and validating the selected production origin/proxy/CDN path. This
+checkpoint does not authorize publication, a merge to the older remote
+Draft-02 `main`, or external distribution.
