@@ -112,13 +112,50 @@ compatibility tests passed in the alpha.4 source suite.
 All disposable containers, volumes, and the dedicated Docker network were
 removed after validation.
 
-### Selected-Site Expectation
+### Selected-Site Evidence
 
-The first llmpages.org run is expected to report public-delivery failures for
-the previously observed Cloudflare/LiteSpeed transformed lane. A bounded,
-truthful `fail` is a successful diagnostic result. The initial alpha.4 test
-must not change Cloudflare, LiteSpeed, WordPress, cache-plugin, route, or epoch
-settings.
+Alpha.4 was installed on llmpages.org and its explicit runtime Doctor
+completed in approximately five seconds. It returned a bounded, truthful
+public-delivery `fail` while retaining:
+
+- exact identity JSON, profile structure, strong ETag, Content-Digest, and
+  Content-Length checks;
+- exact conditional `304`, `HEAD`, unsafe-method, and repeated-stability
+  behavior; and
+- exact M-Sitemap catalog hints for the sampled M-URLs.
+
+The failed mandatory observations were:
+
+- delivered `Cache-Control` lacked `no-transform`;
+- a request advertising gzip received `Content-Encoding: gzip`;
+- the intermediary changed the strong identity ETag to a weak ETag for that
+  coded response; and
+- the catalog request forbidding identity received `200` instead of `406`.
+
+The runtime reported only allowlisted diagnostic signals: LiteSpeed server
+software, Cloudflare response server, Cloudflare `DYNAMIC` cache status, and
+LiteSpeed `X-Turbo-Charged-By`. It did not claim that any detected product
+caused an observation. Origin-only and WordPress-cache integration remained
+`not_tested`.
+
+The packaged external validator independently corroborated the result:
+
+```text
+schema: tct-external-validator-report-v1
+requests: 16
+redirects: 0
+sampled_murls: 3
+checks: 97
+failed: 21
+response_bytes: 111222
+elapsed_seconds: 26.449
+exit: 1
+```
+
+Its failures were confined to the same delivered `no-transform`, gzip-coded
+response/weak-validator, and identity-forbidden observations. The runtime
+Doctor and external validator did not mutate Cloudflare, LiteSpeed,
+WordPress, cache-plugin, route, namespace, or epoch settings.
 
 ### Rollback
 
@@ -130,6 +167,7 @@ historical identity recomputation.
 
 ## Verdict
 
-The private alpha.4 diagnostic package passed its bounded release gate and is
-appropriate for installation on llmpages.org. This verdict does not authorize
-Checkpoint 2 or establish public/production support.
+The private alpha.4 diagnostic package passed its bounded release gate,
+installed successfully on llmpages.org, and correctly classified the known
+negative public-delivery lane. This verdict does not authorize Checkpoint 2
+or establish public/production support.
