@@ -636,6 +636,11 @@ boundary, support labels, and evidence matrix before runtime work.
 
 ### Checkpoint 1: Read-Only Doctor
 
+The proposed implementation design is documented in
+[`CHECKPOINT1_DEPLOYMENT_DOCTOR_IMPLEMENTATION_PLAN.md`](CHECKPOINT1_DEPLOYMENT_DOCTOR_IMPLEMENTATION_PLAN.md).
+It remains documentation-only and requires a separate implementation
+authorization.
+
 Not authorized by this document:
 
 - compression-aware public-path verifier;
