@@ -65,6 +65,11 @@ internal representation-cache epoch. It leaves historical transient rows to
 expire, rebuilds the new generation on demand, and does not purge browser,
 LiteSpeed, reverse-proxy, or CDN caches.
 
+Future cache compatibility is governed by the documentation-first
+[`TCT Draft-03 Cache Interoperability Contract`](docs/CACHE_INTEROPERABILITY_CONTRACT.md).
+Its adapters, Deployment Doctor, validated shared-caching mode, and provider
+support claims are not implemented or authorized yet.
+
 Receipts require a runtime `TCT_RECEIPT_HMAC_KEY` of at least 32 bytes. API
 keys can be supplied at runtime through comma-separated `TCT_API_KEYS`, or
 entered once in the internal admin UI and persisted only as SHA-256 digests.
