@@ -1,6 +1,7 @@
 # Draft-03 Internal Conformance Baseline
 
-The normative source for the `3.0.0-alpha.2` internal implementation is:
+The normative source for the `3.0.0-alpha.2` wire generation, retained
+unchanged by the `3.0.0-alpha.3` cache-administration test package, is:
 
 `DN/internal-drafts/IETF Drafts/publication-candidates-2026-07-23/draft-jurkovikj-collab-tunnel-03.md`
 
@@ -53,5 +54,6 @@ matrix is complete.
 - Unknown extension members remain part of the certified JCS value. A filtered
   M-URL cannot change `canonical_url` away from the emitted canonical Link
   target.
-- Alpha.2 never reads alpha.1 body, validator, or plaintext-key cache/config
-  fields. Its cache namespace and epoch are distinct.
+- The alpha.2 wire generation, retained by alpha.3, never reads alpha.1 body,
+  validator, or plaintext-key cache/config fields. Its cache namespace and
+  epoch are distinct from alpha.1.

@@ -51,7 +51,9 @@ function tct_cache_admin_page() {
                 <p>
                     Cache generation advanced to epoch
                     <strong><?php echo esc_html((string) $epoch); ?></strong>.
-                    Historical transient rows will expire naturally and are no longer addressable.
+                    Historical internal transient rows are no longer addressable and will expire
+                    naturally. The new generation will rebuild on demand. External caches were
+                    not purged.
                 </p>
             </div>
         <?php endif; ?>
@@ -78,7 +80,11 @@ function tct_cache_admin_page() {
                     </tr>
                     <tr>
                         <th scope="row">M-Sitemap status</th>
-                        <td><?php echo $sitemap_identity ? 'Certified and cached' : 'Not cached'; ?></td>
+                        <td>
+                            <?php echo $sitemap_identity
+                                ? 'Certified and cached for the current epoch'
+                                : 'Not cached; rebuilt on demand'; ?>
+                        </td>
                     </tr>
                     <?php if ($sitemap_identity): ?>
                         <tr>
@@ -95,15 +101,31 @@ function tct_cache_admin_page() {
         </div>
 
         <div class="card" style="max-width: 800px; margin-top: 20px;">
-            <h2>Invalidate Current Generation</h2>
+            <h2>Invalidate TCT Representation Cache</h2>
             <p>
-                Advancing the epoch invalidates all current post and sitemap representations
-                atomically without scanning transient storage.
+                This advances the internal epoch from
+                <code><?php echo esc_html((string) $epoch); ?></code> to
+                <code><?php echo esc_html((string) ($epoch + 1)); ?></code>. All current TCT post
+                and sitemap cache keys become unreachable atomically, without scanning or
+                deleting transient storage. Representations are rebuilt when they are next
+                requested.
             </p>
+            <div class="notice notice-warning inline">
+                <p>
+                    <strong>External caches are separate.</strong>
+                    This action does not purge browser, LiteSpeed, reverse-proxy, or Cloudflare
+                    caches. Purge those separately when required. The first request to the new
+                    generation may be slower while representations rebuild.
+                </p>
+            </div>
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                 <?php wp_nonce_field('tct_clear_cache'); ?>
                 <input type="hidden" name="action" value="tct_clear_cache">
-                <button type="submit" class="button button-primary">Advance Cache Epoch</button>
+                <button
+                    type="submit"
+                    class="button button-primary"
+                    onclick="return window.confirm('Invalidate the current TCT cache generation? The next TCT request may be slower while representations rebuild.');"
+                >Invalidate TCT Cache Generation</button>
             </form>
         </div>
     </div>

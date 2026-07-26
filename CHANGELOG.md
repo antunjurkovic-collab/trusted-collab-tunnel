@@ -4,6 +4,15 @@ This file records private WordPress reference checkpoints. It does not imply
 publication, production support, or conformance to an Internet-Draft that has
 not been submitted.
 
+## 3.0.0-alpha.3 — internal test package
+
+- Retained the exact alpha.2 Draft-03 wire behavior, schemas, profiles,
+  identity bytes, validators, routes, and `tct_v03_alpha2` cache namespace.
+- Clarified that cache-epoch invalidation is an internal, lazy representation
+  generation switch rather than an external cache purge.
+- Added an explicit confirmation before invalidation and clearer current-cache
+  status and completion notices.
+
 ## 3.0.0-alpha.2 — internal
 
 - Pinned the reworked 2026-07-23 Draft-03 source and its SHA-256 identity.

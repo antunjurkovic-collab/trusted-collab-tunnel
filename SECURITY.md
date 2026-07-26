@@ -4,6 +4,7 @@
 
 | Version | Supported |
 | ------- | --------- |
+| 3.0.0-alpha.3 | Internal alpha review only |
 | 3.0.0-alpha.2 | Internal alpha review only |
 | 3.0.0-alpha.1 | Frozen internal reconstruction |
 | 2.x | Legacy draft-02 implementation |

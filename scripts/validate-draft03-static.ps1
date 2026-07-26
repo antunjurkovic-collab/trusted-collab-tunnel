@@ -29,7 +29,7 @@ $baseline = Read-File 'docs/DRAFT03_INTERNAL_BASELINE.md'
 $mUrlProfile = 'https://www.ietf.org/archive/id/draft-jurkovikj-collab-tunnel-03.html#tct-m-url-profile'
 $sitemapProfile = 'https://www.ietf.org/archive/id/draft-jurkovikj-collab-tunnel-03.html#tct-m-sitemap-profile'
 
-Add-Check 'version_alpha2' ($main -match 'Version:\s+3\.0\.0-alpha\.2')
+Add-Check 'version_alpha3' ($main -match 'Version:\s+3\.0\.0-alpha\.3')
 Add-Check 'php_81_floor' ($main -match 'Requires PHP:\s+8\.1')
 Add-Check 'runtime_autoloader' ($main -match "TCT\\\\Draft03\\\\" -and $main -match 'src/Draft03/')
 Add-Check 'baseline_source_digest_pinned' ($baseline -match 'F1B2A1C9C50293C0DF5936F58BABB5F4FAFA895510A4228CA73C71698D2A6159')
@@ -144,7 +144,7 @@ Add-Check 'receipt_secret_runtime_only' (
 Add-Check 'stats_writes_opt_in' ($stats -match "get_option\('tct_stats_enabled', 0\)")
 Add-Check 'changes_writes_opt_in' ($changes -match "get_option\('tct_changes_enabled', 0\)")
 Add-Check 'readme_internal_nonstable' (
-    $readme -match '3\.0\.0-alpha\.2' -and
+    $readme -match '3\.0\.0-alpha\.3' -and
     $readme -match 'Internal' -and
     $readme -match 'non-stable|not.*production'
 )

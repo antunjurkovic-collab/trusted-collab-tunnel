@@ -3,7 +3,7 @@ Contributors: antunjurkovic
 Tags: http, json, etag, sitemap
 Requires at least: 6.0
 Requires PHP: 8.1
-Stable tag: 3.0.0-alpha.2
+Stable tag: 3.0.0-alpha.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -26,6 +26,11 @@ Policy, receipts, telemetry, changes, llms.txt, and manifest resources are
 non-core experiments disabled or separated from the core contract.
 
 == Changelog ==
+
+= 3.0.0-alpha.3 =
+* Retains the alpha.2 Draft-03 wire behavior and cache namespace.
+* Clarifies lazy internal cache-generation invalidation, external-cache
+  boundaries, and confirmation before advancing the epoch.
 
 = 3.0.0-alpha.2 =
 * Pins the substantially reworked 2026-07-23 internal Draft-03 source.

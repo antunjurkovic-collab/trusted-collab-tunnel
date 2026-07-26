@@ -1,14 +1,16 @@
 # Trusted Collaboration Tunnel — Internal Draft-03 Reference
 
-Version `3.0.0-alpha.2` is a private, non-stable WordPress reference
+Version `3.0.0-alpha.3` is a private, non-stable WordPress reference
 implementation for the unpublished Collaboration Content Transfer Draft-03.
 It is not a production release and is not the older remotely published
 Draft-02 plugin.
 
 The immutable alpha.1 reconstruction is tagged
-`tct-wordpress-v3.0.0-alpha.1-internal`. Alpha.2 is additive and follows the
-newer, substantially reworked internal Draft-03 baseline pinned in
+`tct-wordpress-v3.0.0-alpha.1-internal`. Alpha.2 introduced the additive,
+substantially reworked internal Draft-03 generation pinned in
 [`docs/DRAFT03_INTERNAL_BASELINE.md`](docs/DRAFT03_INTERNAL_BASELINE.md).
+Alpha.3 retains its exact protocol behavior and `tct_v03_alpha2` cache
+namespace; it only clarifies the cache-administration control.
 
 ## Core Surface
 
@@ -57,6 +59,11 @@ manifest, cache administration, and shortcodes are deployment experiments.
 They do not establish TCT conformance, authorization, licensing, publisher
 intent, or enforceable policy. Request-time statistics, write-path change
 records, and receipt emission are disabled by default.
+
+The cache-administration invalidation action advances only the plugin's
+internal representation-cache epoch. It leaves historical transient rows to
+expire, rebuilds the new generation on demand, and does not purge browser,
+LiteSpeed, reverse-proxy, or CDN caches.
 
 Receipts require a runtime `TCT_RECEIPT_HMAC_KEY` of at least 32 bytes. API
 keys can be supplied at runtime through comma-separated `TCT_API_KEYS`, or
@@ -112,7 +119,7 @@ activate it. Default core resources are:
 - `/llm-sitemap.json`
 - `/{canonical}/llm/`
 
-Do not publish alpha.2 or describe it as conforming to a published `-03`
+Do not publish alpha.3 or describe it as conforming to a published `-03`
 revision until the exact pinned draft text is submitted without a
 wire-affecting change and legal, public-facing metadata, and the selected
 deployment path receive separate review.
