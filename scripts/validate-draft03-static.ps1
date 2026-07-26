@@ -25,6 +25,13 @@ $protocol = Read-File 'src/Draft03/Protocol.php'
 $jcs = Read-File 'src/Draft03/JcsEncoder.php'
 $readme = Read-File 'README.md'
 $baseline = Read-File 'docs/DRAFT03_INTERNAL_BASELINE.md'
+$doctor = Read-File 'src/Compatibility/Doctor/DeploymentDoctor.php'
+$doctorPreflight = Read-File 'src/Compatibility/Doctor/BoundedJsonPreflight.php'
+$doctorTransport = Read-File 'includes/Compatibility/WordPressHttpTransport.php'
+$doctorSerializer = Read-File 'includes/Compatibility/WordPressReportSerializer.php'
+$doctorAdmin = Read-File 'includes/Compatibility/CompatibilityAdminController.php'
+$doctorStore = Read-File 'includes/Compatibility/DoctorReportStore.php'
+$liveValidator = Read-File 'scripts/validate-live.ps1'
 
 $mUrlProfile = 'https://www.ietf.org/archive/id/draft-jurkovikj-collab-tunnel-03.html#tct-m-url-profile'
 $sitemapProfile = 'https://www.ietf.org/archive/id/draft-jurkovikj-collab-tunnel-03.html#tct-m-sitemap-profile'
@@ -147,6 +154,48 @@ Add-Check 'readme_internal_nonstable' (
     $readme -match '3\.0\.0-alpha\.3' -and
     $readme -match 'Internal' -and
     $readme -match 'non-stable|not.*production'
+)
+Add-Check 'doctor_additive_runtime_wiring' (
+    $main -match "TCT\\\\Compatibility\\\\Doctor\\\\" -and
+    $main -match 'src/Compatibility/Doctor/' -and
+    $main -match 'includes/Compatibility/bootstrap.php'
+)
+Add-Check 'doctor_safe_raw_wordpress_transport' (
+    $doctorTransport -match 'wp_safe_remote_request' -and
+    $doctorTransport -match "'redirection'\s*=>\s*0" -and
+    $doctorTransport -match "'decompress'\s*=>\s*false" -and
+    $doctorTransport -match "'limit_response_size'" -and
+    $doctorTransport -match "'cookies'\s*=>\s*\[\]"
+)
+Add-Check 'doctor_bounded_before_json_allocation' (
+    $doctor -match 'BoundedJsonPreflight' -and
+    $doctorPreflight -match 'MAX_JSON_DEPTH' -and
+    $doctorPreflight -match 'MAX_JSON_NODES' -and
+    $doctor -match 'JSON_THROW_ON_ERROR'
+)
+Add-Check 'doctor_authoritative_bounded_report' (
+    $doctorSerializer -match 'wp_json_encode' -and
+    $doctorSerializer -match 'maxDiagnosticTextBytes' -and
+    $doctorSerializer -match 'maxDiagnosticBytes'
+)
+Add-Check 'doctor_admin_explicit_owner_scoped' (
+    $doctorAdmin -match 'admin_post_tct_run_deployment_doctor' -and
+    $doctorAdmin -match 'manage_options' -and
+    $doctorAdmin -match 'check_admin_referer' -and
+    $doctorStore -match '\$userId' -and
+    $doctorStore -match 'random_bytes'
+)
+Add-Check 'doctor_no_adapter_or_purge_mutation' (
+    $doctorAdmin -notmatch 'update_option|delete_option|tct_bump_cache_epoch|litespeed_purge|rocket_clean' -and
+    $doctorTransport -notmatch 'update_option|delete_option|tct_bump_cache_epoch|litespeed_purge|rocket_clean'
+)
+Add-Check 'external_validator_raw_bounded' (
+    $liveValidator -match 'AutomaticDecompression\s*=\s*\[Net\.DecompressionMethods\]::None' -and
+    $liveValidator -match 'AllowAutoRedirect\s*=\s*\$false' -and
+    $liveValidator -match 'ResponseHeadersRead' -and
+    $liveValidator -match 'Read-BoundedBody' -and
+    $liveValidator -match 'Expand-GzipBounded' -and
+    $liveValidator -match 'unexpected_content_coding'
 )
 
 $failed = @($checks | Where-Object { -not $_.ok })
