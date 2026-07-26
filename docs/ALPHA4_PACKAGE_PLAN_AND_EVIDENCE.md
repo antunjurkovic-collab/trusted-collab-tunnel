@@ -157,6 +157,50 @@ response/weak-validator, and identity-forbidden observations. The runtime
 Doctor and external validator did not mutate Cloudflare, LiteSpeed,
 WordPress, cache-plugin, route, namespace, or epoch settings.
 
+### Origin-vs-Edge Isolation
+
+The Cloudflare apex record identified `198.54.116.200` as the proxied
+llmpages.org origin. The previously supplied Namecheap server hostname
+resolved to a different address and its default cPanel virtual host; it was
+not used further.
+
+Direct origin HTTPS was externally unreachable. The bounded comparison
+therefore used the origin's HTTP listener with `Host: llmpages.org` and the
+standard `X-Forwarded-Proto: https` indicator used by the deployment. No
+credential or private representation was transmitted.
+
+| Origin case | Status | Bytes | Content-Encoding | ETag/result |
+| --- | ---: | ---: | --- | --- |
+| Sitemap identity | 200 | 6,409 | none | exact strong identity ETag |
+| Sitemap gzip advertised | 200 | 6,409 | none | same body and strong ETag |
+| Sitemap identity forbidden | 406 | 0 | none | rejected as required |
+| M-URL identity | 200 | 5,010 | none | exact strong identity ETag |
+| M-URL gzip advertised | 200 | 5,010 | none | same body and strong ETag |
+| M-URL identity forbidden | 406 | 0 | none | rejected as required |
+
+Both origin identity resources carried `Vary: Accept-Encoding` and
+`Cache-Control: ... no-transform`. Their body hashes equalled the exact
+public identity ETags:
+
+```text
+sitemap: 7f4aeaf81f092913f990afb7030ac7b4ce4d6e6337381b8c223bf98dfde0343a
+murl:    2084aa293b84904d5cc26eaf8901575d08f14e8a29adf430608d6db585087cc3
+```
+
+This isolates the observed defect after the Namecheap/LiteSpeed origin
+response and within the combined Cloudflare Worker/edge delivery boundary:
+
+- the origin emits `no-transform`; the delivered response omits it;
+- the origin preserves identity under gzip advertisement; the delivered
+  response is gzip-coded and its ETag is weakened; and
+- the origin returns `406` when identity is forbidden; the delivered response
+  returns `200`.
+
+Cloudflare has a wildcard `*llmpages.org/*` route to `tct-worker`, plus
+specific routes to the same Worker. This evidence does not yet distinguish
+Worker-script behavior from automatic Cloudflare edge behavior. Reviewing
+the Worker source and bindings is required before proposing a correction.
+
 ### Rollback
 
 Reinstalling the retained alpha.3 ZIP with `--force`, or deactivating and
