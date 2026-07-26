@@ -12,6 +12,8 @@
     },
     "autoload": {
         "psr-4": {
+            "TCT\\Compatibility\\Doctor\\": "src/Compatibility/Doctor/",
+            "TCT\\Compatibility\\WordPress\\": "includes/Compatibility/",
             "TCT\\Draft03\\": "src/Draft03/"
         }
     },

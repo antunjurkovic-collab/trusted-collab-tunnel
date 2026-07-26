@@ -39,6 +39,24 @@ spl_autoload_register(static function($class) {
     }
 });
 
+spl_autoload_register(static function($class) {
+    $prefix = 'TCT\\Compatibility\\Doctor\\';
+    if (!is_string($class) || !str_starts_with($class, $prefix)) {
+        return;
+    }
+
+    $relative = substr($class, strlen($prefix));
+    if ($relative === '' || preg_match('/^[A-Za-z0-9_\\\\]+$/D', $relative) !== 1) {
+        return;
+    }
+
+    $file = TCT_PLUGIN_DIR . 'src/Compatibility/Doctor/'
+        . str_replace('\\', '/', $relative) . '.php';
+    if (is_file($file)) {
+        require_once $file;
+    }
+});
+
 require_once TCT_PLUGIN_DIR . 'includes/Hashing.php';
 require_once TCT_PLUGIN_DIR . 'includes/Policy.php';
 require_once TCT_PLUGIN_DIR . 'includes/PolicyDescriptor.php';
@@ -52,6 +70,7 @@ require_once TCT_PLUGIN_DIR . 'includes/HeadLinks.php';
 require_once TCT_PLUGIN_DIR . 'includes/LLMS.php';
 require_once TCT_PLUGIN_DIR . 'includes/Admin.php';
 require_once TCT_PLUGIN_DIR . 'includes/AdminCache.php';
+require_once TCT_PLUGIN_DIR . 'includes/Compatibility/bootstrap.php';
 require_once TCT_PLUGIN_DIR . 'includes/Stats.php';
 require_once TCT_PLUGIN_DIR . 'includes/Changes.php';
 require_once TCT_PLUGIN_DIR . 'includes/Shortcodes.php';
