@@ -1,5 +1,5 @@
 param(
-    [string]$Version = '3.0.0-alpha.3'
+    [string]$Version = '3.0.0-alpha.4'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -25,12 +25,30 @@ try {
     $packageFiles = @($tracked | Where-Object {
         $_ -eq 'trusted-collab-tunnel.php' -or
         $_ -match '^includes/[^/]+\.php$' -or
+        $_ -match '^includes/Compatibility/[^/]+\.php$' -or
+        $_ -match '^src/Compatibility/Doctor/[^/]+\.php$' -or
         $_ -match '^src/Draft03/[^/]+\.php$' -or
+        $_ -eq 'scripts/validate-live.ps1' -or
         $_ -in @('README.md', 'readme.txt', 'CHANGELOG.md', 'SECURITY.md', 'PATENTS.md', 'LICENSE')
     } | Sort-Object)
 
     if ($packageFiles.Count -lt 10) {
         throw 'Unexpectedly small runtime package file set.'
+    }
+
+    $requiredPackageFiles = @(
+        'includes/Compatibility/bootstrap.php',
+        'includes/Compatibility/CompatibilityAdminController.php',
+        'includes/Compatibility/WordPressHttpTransport.php',
+        'includes/Compatibility/WordPressReportSerializer.php',
+        'scripts/validate-live.ps1',
+        'src/Compatibility/Doctor/DeploymentDoctor.php',
+        'src/Compatibility/Doctor/DoctorReport.php'
+    )
+    foreach ($required in $requiredPackageFiles) {
+        if ($required -notin $packageFiles) {
+            throw "Required alpha.4 runtime or validator file is absent: $required"
+        }
     }
 
     function Get-GitBlobBytes {

@@ -1,6 +1,6 @@
 # Checkpoint 1 Deployment Doctor Evidence
 
-Status: implementation candidate complete; mandatory review open
+Status: accepted and frozen by project owner
 
 Contract: [`CACHE_INTEROPERABILITY_CONTRACT.md`](CACHE_INTEROPERABILITY_CONTRACT.md)
 
@@ -233,10 +233,11 @@ Doctor checkpoint.
 - Loopback-restricted hosts require the external validator.
 - Reports expire after one hour and are marked stale on version/route mismatch.
 - Provider recipes are not implemented by this checkpoint.
-- The current alpha.3 package builder deliberately selects only its frozen
-  root `includes/*.php` and `src/Draft03/*.php` runtime generation. Nested
-  Checkpoint 1 files are therefore not packaged. Packaging remains a separate,
-  unapproved slice.
+- At this evidence checkpoint, the alpha.3 package builder deliberately
+  selected only its frozen root `includes/*.php` and `src/Draft03/*.php`
+  runtime generation. The project owner subsequently authorized a separate,
+  narrow alpha.4 packaging closure. That closure must package the nested
+  Doctor runtime explicitly without widening protocol behavior.
 
 ## Acceptance Mapping
 
@@ -253,6 +254,9 @@ Doctor checkpoint.
 
 ## Verdict
 
-Checkpoint 1 is ready for its mandatory Team Control evidence review.
+The project owner reviewed this packet and accepted and froze Checkpoint 1 on
+2026-07-26.
 
-It is not yet accepted or frozen. No Checkpoint 2 work is authorized.
+The later alpha.4 packaging authorization does not authorize Checkpoint 2,
+cache adapters, purges, provider mutation, shared-cache claims, or protocol
+changes.

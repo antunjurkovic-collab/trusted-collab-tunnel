@@ -316,7 +316,8 @@ final class CompatibilityAdminController
             <h3>External Rerun</h3>
             <p>
                 If this host cannot loop back to its own public name, run the equivalent
-                validator externally:
+                validator from an extracted alpha.4 package or source checkout on an
+                external Windows machine:
             </p>
             <p><code><?php echo esc_html((string) ($report['external_validator_command'] ?? '')); ?></code></p>
 

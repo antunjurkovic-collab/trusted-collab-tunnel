@@ -1,6 +1,6 @@
 # Trusted Collaboration Tunnel — Internal Draft-03 Reference
 
-Version `3.0.0-alpha.3` is a private, non-stable WordPress reference
+Version `3.0.0-alpha.4` is a private, non-stable WordPress reference
 implementation for the unpublished Collaboration Content Transfer Draft-03.
 It is not a production release and is not the older remotely published
 Draft-02 plugin.
@@ -9,8 +9,10 @@ The immutable alpha.1 reconstruction is tagged
 `tct-wordpress-v3.0.0-alpha.1-internal`. Alpha.2 introduced the additive,
 substantially reworked internal Draft-03 generation pinned in
 [`docs/DRAFT03_INTERNAL_BASELINE.md`](docs/DRAFT03_INTERNAL_BASELINE.md).
-Alpha.3 retains its exact protocol behavior and `tct_v03_alpha2` cache
-namespace; it only clarifies the cache-administration control.
+Alpha.3 retained its exact protocol behavior and `tct_v03_alpha2` cache
+namespace while clarifying cache administration. Alpha.4 retains that same
+wire generation and adds the bounded, administrator-initiated, read-only
+Deployment Doctor.
 
 ## Core Surface
 
@@ -68,9 +70,9 @@ LiteSpeed, reverse-proxy, or CDN caches.
 Future cache compatibility is governed by the documentation-first
 [`TCT Draft-03 Cache Interoperability Contract`](docs/CACHE_INTEROPERABILITY_CONTRACT.md).
 Its read-only Checkpoint 1 Deployment Doctor is implemented internally and is
-stopped for evidence review. It has not been packaged or deployed. Cache
-adapters, purges, validated shared-caching mode, and provider support claims
-remain unapproved and unimplemented.
+accepted by the project owner and packaged in alpha.4 for deployment
+diagnostics. Cache adapters, purges, validated shared-caching mode, and
+provider support claims remain unapproved and unimplemented.
 
 Receipts require a runtime `TCT_RECEIPT_HMAC_KEY` of at least 32 bytes. API
 keys can be supplied at runtime through comma-separated `TCT_API_KEYS`, or
@@ -118,10 +120,15 @@ Run the live validator only against a disposable installation:
 & ./scripts/validate-live.ps1 -BaseUrl 'https://disposable.example'
 ```
 
+The alpha.4 package includes this script for an external Windows rerun. Extract
+the package locally before running it; the WordPress administrator page does
+not execute the script on the server.
+
 After a clean commit, `scripts/build-package.ps1` creates two independently
 assembled ZIPs with fixed entry metadata, requires byte identity, retains one
 artifact, and writes its SHA-256 sidecar. The ZIP contains a source/draft/file
-digest manifest.
+digest manifest. Alpha.4 packaging scope and results are recorded in
+[`docs/ALPHA4_PACKAGE_PLAN_AND_EVIDENCE.md`](docs/ALPHA4_PACKAGE_PLAN_AND_EVIDENCE.md).
 
 ## Installation
 
@@ -131,7 +138,7 @@ activate it. Default core resources are:
 - `/llm-sitemap.json`
 - `/{canonical}/llm/`
 
-Do not publish alpha.3 or describe it as conforming to a published `-03`
+Do not publish alpha.4 or describe it as conforming to a published `-03`
 revision until the exact pinned draft text is submitted without a
 wire-affecting change and legal, public-facing metadata, and the selected
 deployment path receive separate review.

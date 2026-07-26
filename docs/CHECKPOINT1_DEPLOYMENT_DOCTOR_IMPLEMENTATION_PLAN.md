@@ -1,12 +1,12 @@
 # Checkpoint 1 Deployment Doctor Implementation Plan
 
-Status: implemented candidate; mandatory evidence review open
+Status: accepted and frozen by project owner
 
 Contract: [`CACHE_INTEROPERABILITY_CONTRACT.md`](CACHE_INTEROPERABILITY_CONTRACT.md)
 
 Implementation authorization: project owner approved Checkpoint 1 on 2026-07-26
 
-Target: mandatory Team Control review and freeze decision
+Decision authority: project owner
 
 Last updated: 2026-07-26
 
@@ -22,6 +22,12 @@ implementation after reviewing the documentation checkpoint. That
 authorization did not include cache-product adapters, option changes, route
 changes, purges, a shared-caching mode, a package, an alpha.4 release, or a
 live-site change.
+
+After reviewing the completed Checkpoint 1 evidence, the project owner
+accepted and froze the implementation on 2026-07-26. A separate narrow
+authorization covers only alpha.4 metadata, deterministic packaging, packaged
+installation evidence, and llmpages.org diagnostic testing. It does not
+authorize Checkpoint 2.
 
 ## Objective
 
@@ -713,7 +719,7 @@ correctly, safely, and without asserting which detected layer caused it.
 
 ## Acceptance Gate
 
-Checkpoint 1 can be presented for Team Control review only when:
+Checkpoint 1 could be presented for project-owner review only when:
 
 1. all existing alpha.3 representation and route tests remain unchanged and
    green;
@@ -730,7 +736,7 @@ Checkpoint 1 can be presented for Team Control review only when:
    deterministic; and
 9. loopback failure is demonstrably `inconclusive`.
 
-The mandatory stop then reviews:
+The mandatory owner stop reviewed:
 
 - outcome classifications;
 - diagnostic safety;

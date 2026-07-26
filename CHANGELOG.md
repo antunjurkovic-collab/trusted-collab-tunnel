@@ -4,6 +4,19 @@ This file records private WordPress reference checkpoints. It does not imply
 publication, production support, or conformance to an Internet-Draft that has
 not been submitted.
 
+## 3.0.0-alpha.4 — internal diagnostic test package
+
+- Retained the exact alpha.3 Draft-03 wire behavior, schemas, routes, cache
+  namespace, and cache epoch.
+- Added the bounded, administrator-initiated, read-only Deployment Doctor and
+  secret-free JSON evidence export.
+- Added safe raw-byte public-path validation with bounded gzip and JSON
+  processing.
+- Included the Doctor runtime and external validator in the deterministic
+  package allowlist.
+- Added owner-scoped, one-hour diagnostic report storage without cache,
+  provider, route, or deployment mutation.
+
 ## 3.0.0-alpha.3 — internal test package
 
 - Retained the exact alpha.2 Draft-03 wire behavior, schemas, profiles,

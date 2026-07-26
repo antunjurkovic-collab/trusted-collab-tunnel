@@ -3,7 +3,7 @@ Contributors: antunjurkovic
 Tags: http, json, etag, sitemap
 Requires at least: 6.0
 Requires PHP: 8.1
-Stable tag: 3.0.0-alpha.3
+Stable tag: 3.0.0-alpha.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -26,6 +26,13 @@ Policy, receipts, telemetry, changes, llms.txt, and manifest resources are
 non-core experiments disabled or separated from the core contract.
 
 == Changelog ==
+
+= 3.0.0-alpha.4 =
+* Retains the alpha.3 Draft-03 wire behavior, routes, and cache generation.
+* Adds the bounded, administrator-initiated, read-only Deployment Doctor.
+* Exports owner-scoped, secret-free diagnostic JSON without changing caches,
+  providers, routes, or infrastructure.
+* Packages the bounded external public-path validator for separate execution.
 
 = 3.0.0-alpha.3 =
 * Retains the alpha.2 Draft-03 wire behavior and cache namespace.
