@@ -67,8 +67,10 @@ LiteSpeed, reverse-proxy, or CDN caches.
 
 Future cache compatibility is governed by the documentation-first
 [`TCT Draft-03 Cache Interoperability Contract`](docs/CACHE_INTEROPERABILITY_CONTRACT.md).
-Its adapters, Deployment Doctor, validated shared-caching mode, and provider
-support claims are not implemented or authorized yet.
+Its read-only Checkpoint 1 Deployment Doctor is implemented internally and is
+stopped for evidence review. It has not been packaged or deployed. Cache
+adapters, purges, validated shared-caching mode, and provider support claims
+remain unapproved and unimplemented.
 
 Receipts require a runtime `TCT_RECEIPT_HMAC_KEY` of at least 32 bytes. API
 keys can be supplied at runtime through comma-separated `TCT_API_KEYS`, or
@@ -104,6 +106,11 @@ number table, exact IEEE-754 inputs, UTF-16 key ordering, deterministic Node
 `JSON.stringify` parity probes, Draft-03 Appendix C identity evidence,
 conditional-request parsing, schema rejection, resource boundaries,
 Gutenberg recursion, exposure policy, and hashed key behavior.
+
+The additive Checkpoint 1 suite also covers safe raw-byte WordPress transport,
+same-origin redirects, deterministic outcomes, strict report-size parity,
+pre-allocation JSON depth/node checks, gzip expansion, owner-scoped evidence,
+and constrained-memory subprocess completion.
 
 Run the live validator only against a disposable installation:
 

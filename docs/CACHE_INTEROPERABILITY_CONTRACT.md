@@ -638,10 +638,11 @@ boundary, support labels, and evidence matrix before runtime work.
 
 The proposed implementation design is documented in
 [`CHECKPOINT1_DEPLOYMENT_DOCTOR_IMPLEMENTATION_PLAN.md`](CHECKPOINT1_DEPLOYMENT_DOCTOR_IMPLEMENTATION_PLAN.md).
-It remains documentation-only and requires a separate implementation
-authorization.
+The project owner separately authorized this checkpoint on 2026-07-26. The
+implementation candidate and its evidence are documented in
+[`CHECKPOINT1_DEPLOYMENT_DOCTOR_EVIDENCE.md`](CHECKPOINT1_DEPLOYMENT_DOCTOR_EVIDENCE.md).
 
-Not authorized by this document:
+The separately authorized Checkpoint 1 scope is:
 
 - compression-aware public-path verifier;
 - bounded administrator UI and evidence export;
@@ -674,8 +675,9 @@ Not authorized by this document:
 
 ## Stop Gate
 
-Stop after committing the documentation-only checkpoint for review.
+Checkpoint 0 is closed. Checkpoint 1 was separately authorized and is now at
+its mandatory evidence-review stop.
 
-No PHP implementation, adapter, Doctor endpoint, third-party option mutation,
-cache purge, live-site change, new package, publication claim, or alpha.4
-release is authorized by this contract.
+No further PHP implementation, adapter, public Doctor endpoint, third-party
+option mutation, cache purge, live-site change, new package, publication
+claim, alpha.4 release, or Checkpoint 2 work is authorized.

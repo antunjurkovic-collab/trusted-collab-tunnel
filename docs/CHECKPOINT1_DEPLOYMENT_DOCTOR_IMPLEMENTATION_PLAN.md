@@ -1,12 +1,12 @@
 # Checkpoint 1 Deployment Doctor Implementation Plan
 
-Status: documentation-only implementation design
+Status: implemented candidate; mandatory evidence review open
 
 Contract: [`CACHE_INTEROPERABILITY_CONTRACT.md`](CACHE_INTEROPERABILITY_CONTRACT.md)
 
-Implementation authorization: **none**
+Implementation authorization: project owner approved Checkpoint 1 on 2026-07-26
 
-Target: a separately reviewed Checkpoint 1 implementation
+Target: mandatory Team Control review and freeze decision
 
 Last updated: 2026-07-26
 
@@ -17,9 +17,11 @@ Deployment Doctor. It will observe TCT's public delivery path, classify
 failures without changing infrastructure, and export a bounded, secret-free
 report.
 
-This plan does not authorize PHP changes. In particular, it does not authorize
-cache-product adapters, option changes, route changes, purges, a shared-caching
-mode, a package, an alpha.4 release, or a live-site change.
+The project owner separately authorized this narrowly bounded Checkpoint 1
+implementation after reviewing the documentation checkpoint. That
+authorization did not include cache-product adapters, option changes, route
+changes, purges, a shared-caching mode, a package, an alpha.4 release, or a
+live-site change.
 
 ## Objective
 
@@ -759,7 +761,14 @@ detected.
 
 ## Stop Gate
 
-Stop after this documentation-only plan is committed for review.
+The implementation candidate is recorded by:
 
-No PHP, Composer/autoloader, test, script, package, deployment, provider,
-WordPress setting, cache, CDN, or live-site change is authorized by this plan.
+- `f9dc0b9ff74834092471eedf51afdc40f6ada5b9` — bounded read-only Doctor,
+  isolated WordPress adapter, administrator UI, and tests; and
+- `c37a09d18c65af239bda26a63c3f9a1edd016afc` — raw-byte-safe external
+  validator and static acceptance checks.
+
+Stop at the mandatory Checkpoint 1 evidence review.
+
+No additional PHP, adapter, purge, package, deployment, provider setting,
+WordPress setting, cache, CDN, live-site, or Checkpoint 2 change is authorized.
