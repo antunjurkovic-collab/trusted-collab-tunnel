@@ -38,9 +38,9 @@ $packageBuilder = Read-File 'scripts/build-package.ps1'
 $mUrlProfile = 'https://www.ietf.org/archive/id/draft-jurkovikj-collab-tunnel-03.html#tct-m-url-profile'
 $sitemapProfile = 'https://www.ietf.org/archive/id/draft-jurkovikj-collab-tunnel-03.html#tct-m-sitemap-profile'
 
-Add-Check 'version_alpha5' (
-    $main -match 'Version:\s+3\.0\.0-alpha\.5' -and
-    $main -match "define\('TCT_VERSION', '3\.0\.0-alpha\.5'\)"
+Add-Check 'version_alpha6' (
+    $main -match 'Version:\s+3\.0\.0-alpha\.6' -and
+    $main -match "define\('TCT_VERSION', '3\.0\.0-alpha\.6'\)"
 )
 Add-Check 'php_81_floor' ($main -match 'Requires PHP:\s+8\.1')
 Add-Check 'runtime_autoloader' ($main -match "TCT\\\\Draft03\\\\" -and $main -match 'src/Draft03/')
@@ -98,6 +98,12 @@ Add-Check 'plain_permalink_murl_route' (
     $endpoint -match "get_query_var\('tct_m_url'\)" -and
     $main -match "update_option_permalink_structure" -and
     $main -match "\[\]\s*=\s*'tct_m_url'"
+)
+Add-Check 'home_path_prefix_removed_once_and_bounded' (
+    $endpoint -match 'tct_request_path_relative_to_home' -and
+    $endpoint -match 'TCT_MAX_REQUEST_PATH_BYTES' -and
+    $endpoint -match 'str_starts_with\(\$request_path, \$home_prefix\)' -and
+    $main -match 'tct_request_path_relative_to_home'
 )
 Add-Check 'protocol_diagnostics_not_displayed' (
     $main -match 'tct_is_protocol_response_request' -and
@@ -167,7 +173,7 @@ Add-Check 'receipt_secret_runtime_only' (
 Add-Check 'stats_writes_opt_in' ($stats -match "get_option\('tct_stats_enabled', 0\)")
 Add-Check 'changes_writes_opt_in' ($changes -match "get_option\('tct_changes_enabled', 0\)")
 Add-Check 'readme_published_nonstable' (
-    $readme -match '3\.0\.0-alpha\.5' -and
+    $readme -match '3\.0\.0-alpha\.6' -and
     $readme -match 'published' -and
     $readme -match 'non-stable|not.*production'
 )
@@ -213,7 +219,10 @@ Add-Check 'external_validator_raw_bounded' (
     $liveValidator -match 'Expand-GzipBounded' -and
     $liveValidator -match 'unexpected_content_coding'
 )
-Add-Check 'alpha5_package_includes_doctor_runtime' (
+Add-Check 'external_validator_preserves_base_path' (
+    $liveValidator -match 'base_url\s*=\s*\$baseUri\.AbsoluteUri\.TrimEnd'
+)
+Add-Check 'alpha6_package_includes_doctor_runtime' (
     $packageBuilder -match '\^includes/Compatibility/' -and
     $packageBuilder -match '\^src/Compatibility/Doctor/' -and
     $packageBuilder -match 'scripts/validate-live\.ps1' -and

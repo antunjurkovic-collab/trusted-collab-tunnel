@@ -1,6 +1,6 @@
 # Collaboration Content Transfer (TCT) — Draft-03 WordPress Reference
 
-Version `3.0.0-alpha.5` is a non-stable WordPress reference implementation for
+Version `3.0.0-alpha.6` is a non-stable WordPress reference implementation for
 the [published Collaboration Content Transfer Internet-Draft revision
 03](https://datatracker.ietf.org/doc/draft-jurkovikj-collab-tunnel/03/).
 It is a release candidate for public experimental testing, not a production
@@ -14,7 +14,9 @@ Alpha.3 retained its exact protocol behavior and `tct_v03_alpha2` cache
 namespace while clarifying cache administration. Alpha.4 retained that wire
 generation and added the bounded, administrator-initiated, read-only
 Deployment Doctor. Alpha.5 pins the exact posted `-03` text, aligns public
-metadata, and closes two fail-closed M-Sitemap extension boundaries. See
+metadata, and closes two fail-closed M-Sitemap extension boundaries. Alpha.6
+repairs pretty M-URL routing when the configured WordPress home URL has a path
+prefix, without changing the Draft-03 representation generation. See
 [`docs/DRAFT03_PUBLISHED_BASELINE.md`](docs/DRAFT03_PUBLISHED_BASELINE.md).
 
 ## Core Surface
@@ -73,9 +75,9 @@ LiteSpeed, reverse-proxy, or CDN caches.
 Cache compatibility is governed by the documentation-first
 [`TCT Draft-03 Cache Interoperability Contract`](docs/CACHE_INTEROPERABILITY_CONTRACT.md).
 Its read-only Checkpoint 1 Deployment Doctor is implemented internally and is
-accepted by the project owner and packaged in alpha.5 for deployment
-diagnostics. Cache adapters, purges, validated shared-caching mode, and
-provider support claims remain unapproved and unimplemented.
+accepted by the project owner, packaged in alpha.5, and retained in alpha.6
+for deployment diagnostics. Cache adapters, purges, validated shared-caching
+mode, and provider support claims remain unapproved and unimplemented.
 
 Receipts require a runtime `TCT_RECEIPT_HMAC_KEY` of at least 32 bytes. API
 keys can be supplied at runtime through comma-separated `TCT_API_KEYS`, or
@@ -123,7 +125,7 @@ Run the live validator only against a disposable installation:
 & ./scripts/validate-live.ps1 -BaseUrl 'https://disposable.example'
 ```
 
-The alpha.5 package includes this script for an external Windows rerun. Extract
+The alpha.6 package includes this script for an external Windows rerun. Extract
 the package locally before running it; the WordPress administrator page does
 not execute the script on the server.
 
@@ -132,6 +134,8 @@ assembled ZIPs with fixed entry metadata, requires byte identity, retains one
 artifact, and writes its SHA-256 sidecar. The ZIP contains a source/draft/file
 digest manifest. Alpha.5 alignment and packaging evidence is recorded in
 [`docs/ALPHA5_PUBLICATION_ALIGNMENT_PLAN_AND_EVIDENCE.md`](docs/ALPHA5_PUBLICATION_ALIGNMENT_PLAN_AND_EVIDENCE.md).
+Alpha.6 path-prefix repair and packaging evidence is recorded in
+[`docs/ALPHA6_PATH_PREFIX_REPAIR_PLAN_AND_EVIDENCE.md`](docs/ALPHA6_PATH_PREFIX_REPAIR_PLAN_AND_EVIDENCE.md).
 The separately tested Pantheon public-delivery lane is characterized
 without a provider-wide claim in
 [`docs/PANTHEON_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md`](docs/PANTHEON_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md).
@@ -153,11 +157,11 @@ activate it. Default core resources are:
 - `/llm-sitemap.json`
 - `/{canonical}/llm/`
 
-Alpha.5 may be published as a GitHub prerelease for experimental testing after
+Alpha.6 may be published as a GitHub prerelease for experimental testing after
 its recorded release gate passes. Do not advertise it as production-ready,
 universally cache-compatible, WordPress.org stable, or independently
 interoperable merely because its source suite passes. Run the Deployment
-Doctor on each real public delivery path. Alpha.5 also has a known adapter
-blocker for WordPress installations served below a URL path such as
-`/subsite`; their advertised pretty post/page M-URLs can fail closed with
-`404`. Root-hosted installations are unaffected by that specific finding.
+Doctor on each real public delivery path. Alpha.6 repairs alpha.5's known
+pretty post/page M-URL failure on WordPress installations served below a URL
+path such as `/subsite`; root and path-prefixed installations remain separate
+deployment lanes that must be validated.

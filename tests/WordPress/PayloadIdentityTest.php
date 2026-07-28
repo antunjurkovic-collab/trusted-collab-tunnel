@@ -245,6 +245,104 @@ namespace TCT\Tests\WordPress {
             );
         }
 
+        public function testRequestPathIsRelativizedAtTheConfiguredHomeBoundary(): void
+        {
+            self::assertSame(
+                '/2026/07/28/post/llm/',
+                \tct_request_path_relative_to_home(
+                    '/2026/07/28/post/llm/',
+                    'https://example.com/'
+                )
+            );
+            self::assertSame(
+                '/2026/07/28/post/llm/',
+                \tct_request_path_relative_to_home(
+                    '/subsite/2026/07/28/post/llm/',
+                    'https://example.com/subsite/'
+                )
+            );
+            self::assertSame(
+                '/post/llm/',
+                \tct_request_path_relative_to_home(
+                    '/scope:deterministic-fixture/post/llm/',
+                    'https://playground.wordpress.net/scope:deterministic-fixture/'
+                )
+            );
+            self::assertSame(
+                '/',
+                \tct_request_path_relative_to_home(
+                    '/subsite',
+                    'https://example.com/subsite/'
+                )
+            );
+        }
+
+        public function testRequestPathRelativizationFailsClosedOutsideExactBoundary(): void
+        {
+            self::assertNull(
+                \tct_request_path_relative_to_home(
+                    '/subsite-other/post/llm/',
+                    'https://example.com/subsite/'
+                )
+            );
+            self::assertNull(
+                \tct_request_path_relative_to_home(
+                    '/post/llm/',
+                    'https://example.com/subsite/'
+                )
+            );
+            self::assertNull(
+                \tct_request_path_relative_to_home(
+                    "/subsite/post/\x00/llm/",
+                    'https://example.com/subsite/'
+                )
+            );
+            self::assertNull(
+                \tct_request_path_relative_to_home(
+                    '',
+                    'https://example.com/subsite/'
+                )
+            );
+            self::assertNull(
+                \tct_request_path_relative_to_home(
+                    'subsite/post/llm/',
+                    'https://example.com/subsite/'
+                )
+            );
+            self::assertNull(
+                \tct_request_path_relative_to_home(
+                    '//subsite/post/llm/',
+                    'https://example.com/subsite/'
+                )
+            );
+            self::assertNull(
+                \tct_request_path_relative_to_home(
+                    '/subsite/post/llm/',
+                    'not-an-absolute-home-url'
+                )
+            );
+        }
+
+        public function testRequestPathRelativizationHasAnExactByteBoundary(): void
+        {
+            $atLimit = '/' . str_repeat('a', TCT_MAX_REQUEST_PATH_BYTES - 1);
+            $overLimit = $atLimit . 'a';
+
+            self::assertSame(
+                $atLimit,
+                \tct_request_path_relative_to_home(
+                    $atLimit,
+                    'https://example.com/'
+                )
+            );
+            self::assertNull(
+                \tct_request_path_relative_to_home(
+                    $overLimit,
+                    'https://example.com/'
+                )
+            );
+        }
+
         private function post(): object
         {
             return (object) [

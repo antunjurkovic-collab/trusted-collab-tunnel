@@ -4,6 +4,17 @@ This file records versioned WordPress reference checkpoints. A checkpoint does
 not imply production support, general host/cache compatibility, or independent
 interoperability.
 
+## 3.0.0-alpha.6 — URL-path-prefix routing repair
+
+- Removed the configured WordPress home-path prefix exactly once before
+  reconstructing a C-URL from a pretty M-URL request.
+- Added exact root, `/subsite`, Playground-style scope, segment-boundary,
+  control-character, and 8 KiB request-path regression coverage.
+- Applied the same relative-path recognition before WordPress 404 handling.
+- Preserved the configured base path in external-validator report metadata.
+- Retained the exact Draft-03 schemas, JSON identity bytes, ETag and digest
+  algorithms, cache namespace, and identity-only response model.
+
 ## 3.0.0-alpha.5 — published Draft-03 release candidate
 
 - Pinned the exact source identity of posted

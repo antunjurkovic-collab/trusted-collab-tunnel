@@ -1,5 +1,5 @@
 param(
-    [string]$Version = '3.0.0-alpha.5'
+    [string]$Version = '3.0.0-alpha.6'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -47,7 +47,7 @@ try {
     )
     foreach ($required in $requiredPackageFiles) {
         if ($required -notin $packageFiles) {
-            throw "Required alpha.5 runtime or validator file is absent: $required"
+            throw "Required alpha.6 runtime or validator file is absent: $required"
         }
     }
 

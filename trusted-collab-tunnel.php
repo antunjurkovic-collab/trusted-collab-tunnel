@@ -3,7 +3,7 @@
  * Plugin Name: Collaboration Content Transfer (TCT) — Draft-03 Reference
  * Plugin URI: https://github.com/antunjurkovic-collab/trusted-collab-tunnel
  * Description: Non-stable WordPress reference implementation of the published Collaboration Content Transfer Draft-03 HTTP profile.
- * Version: 3.0.0-alpha.5
+ * Version: 3.0.0-alpha.6
  * Requires at least: 6.0
  * Requires PHP: 8.1
  * Author: Antun Jurkovikj
@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('TCT_VERSION', '3.0.0-alpha.5');
+define('TCT_VERSION', '3.0.0-alpha.6');
 define('TCT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('TCT_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -199,7 +199,10 @@ function tct_request_is_protocol_route($path) {
         return false;
     }
 
-    $path = '/' . ltrim($path, '/');
+    $path = tct_request_path_relative_to_home($path);
+    if (!is_string($path)) {
+        return false;
+    }
     $singleton_paths = [
         (string) get_option('tct_sitemap_path', '/llm-sitemap.json'),
         (string) get_option('tct_manifest_path', '/llm-manifest.json'),
@@ -293,7 +296,7 @@ function tct_activate_plugin() {
     if (PHP_VERSION_ID < 80100 || PHP_INT_SIZE < 8 || !extension_loaded('mbstring')) {
         wp_die(
             esc_html(
-                'TCT alpha.5 requires 64-bit PHP 8.1 or newer with the mbstring extension.'
+                'TCT alpha.6 requires 64-bit PHP 8.1 or newer with the mbstring extension.'
             )
         );
     }

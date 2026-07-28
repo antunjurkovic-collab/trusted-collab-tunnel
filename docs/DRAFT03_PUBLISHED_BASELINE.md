@@ -1,6 +1,6 @@
 # Published Draft-03 Conformance Baseline
 
-Status: normative baseline for WordPress `3.0.0-alpha.5`
+Status: normative baseline for WordPress `3.0.0-alpha.6`
 
 Recorded: 2026-07-28
 
@@ -54,7 +54,13 @@ Default unfiltered M-URL and M-Sitemap values, routes, profile identifiers,
 identity-only response selection, cache namespace, and validator algorithms
 are unchanged.
 
-## Alpha.5 Core Scope
+Alpha.6 retains that exact protocol baseline and repairs only the WordPress
+adapter's reconstruction of C-URLs from path-prefixed pretty M-URL requests.
+It removes the configured public home-path prefix once before calling
+`home_url()`, applies the same boundary during pre-404 route recognition, and
+preserves that base path in external-validator report metadata.
+
+## Alpha.6 Core Scope
 
 - generic M-Sitemap discovery from the origin root;
 - C-URL/M-URL bidirectional discovery;
@@ -79,11 +85,9 @@ are unchanged.
   manifests, shortcodes, and cache administration are non-core experiments.
 - The Deployment Doctor observes the public path but does not configure or
   purge WordPress, server, reverse-proxy, or CDN caches.
-- Alpha.5 is a non-stable GitHub release candidate. It does not establish
+- Alpha.6 is a non-stable GitHub release candidate. It does not establish
   universal host/cache compatibility, a production support matrix, or
   independent interoperability.
-- Alpha.5 does not support a WordPress public home URL below a path prefix
-  such as `/subsite`. Its non-home pretty M-URL fallback can include that
-  prefix twice during C-URL reconstruction and return `404`. The isolated
-  evidence is recorded in
+- Alpha.5's WordPress public-home-path blocker and the alpha.6 repair boundary
+  are recorded separately in
   [`PLAYGROUND_AND_PATH_PREFIX_ALPHA5_EVIDENCE.md`](PLAYGROUND_AND_PATH_PREFIX_ALPHA5_EVIDENCE.md).

@@ -3,7 +3,7 @@ Contributors: antunjurkovic
 Tags: http, json, etag, sitemap
 Requires at least: 6.0
 Requires PHP: 8.1
-Stable tag: 3.0.0-alpha.5
+Stable tag: 3.0.0-alpha.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -26,6 +26,14 @@ Policy, receipts, telemetry, changes, llms.txt, and manifest resources are
 non-core experiments disabled or separated from the core contract.
 
 == Changelog ==
+
+= 3.0.0-alpha.6 =
+* Removes the configured WordPress home-path prefix exactly once before
+  reconstructing a C-URL from a pretty M-URL request.
+* Supports root, subdirectory, and Playground-style scope path boundaries with
+  an 8 KiB fail-closed request-path ceiling.
+* Preserves the configured base path in external-validator report metadata.
+* Retains Draft-03 JSON, identity, ETag, digest, schema, and cache semantics.
 
 = 3.0.0-alpha.5 =
 * Pins the exact source of the posted Collaboration Content Transfer revision 03.

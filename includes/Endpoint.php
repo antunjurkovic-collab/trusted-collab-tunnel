@@ -1,6 +1,76 @@
 <?php
 if (!defined('ABSPATH')) { exit; }
 
+if (!defined('TCT_MAX_REQUEST_PATH_BYTES')) {
+    define('TCT_MAX_REQUEST_PATH_BYTES', 8192);
+}
+
+/**
+ * Return a request path relative to the configured public WordPress home URL.
+ *
+ * REQUEST_URI includes the installation prefix for WordPress sites served
+ * below paths such as /subsite and Playground browser scopes. home_url()
+ * already supplies that prefix, so route reconstruction must remove it once.
+ * A path outside the configured home boundary fails closed.
+ */
+function tct_request_path_relative_to_home($request_path, $configured_home_url = null) {
+    if (
+        !is_string($request_path)
+        || $request_path === ''
+        || $request_path[0] !== '/'
+        || str_starts_with($request_path, '//')
+        || strlen($request_path) > TCT_MAX_REQUEST_PATH_BYTES
+        || preg_match('/[\x00-\x1F\x7F]/', $request_path) === 1
+    ) {
+        return null;
+    }
+
+    $home_url_value = is_string($configured_home_url)
+        ? $configured_home_url
+        : home_url('/');
+    $home_parts = parse_url($home_url_value);
+    if (
+        !is_array($home_parts)
+        || !isset($home_parts['scheme'], $home_parts['host'])
+        || !in_array(strtolower((string) $home_parts['scheme']), ['http', 'https'], true)
+        || (string) $home_parts['host'] === ''
+        || isset($home_parts['user'])
+        || isset($home_parts['pass'])
+        || isset($home_parts['query'])
+        || isset($home_parts['fragment'])
+    ) {
+        return null;
+    }
+
+    $home_path = isset($home_parts['path']) ? (string) $home_parts['path'] : '/';
+    if (
+        $home_path === ''
+        || $home_path[0] !== '/'
+        || str_starts_with($home_path, '//')
+        || strlen($home_path) > TCT_MAX_REQUEST_PATH_BYTES
+        || preg_match('/[\x00-\x1F\x7F]/', $home_path) === 1
+    ) {
+        return null;
+    }
+
+    $home_path = '/' . trim($home_path, '/');
+    if ($home_path === '/') {
+        return $request_path;
+    }
+
+    if ($request_path === $home_path) {
+        return '/';
+    }
+
+    $home_prefix = $home_path . '/';
+    if (!str_starts_with($request_path, $home_prefix)) {
+        return null;
+    }
+
+    $relative = substr($request_path, strlen($home_path));
+    return is_string($relative) && $relative !== '' ? $relative : '/';
+}
+
 function tct_handle_requests() {
     $endpoint = sanitize_title((string) get_option('tct_endpoint_slug', 'llm'));
     if ($endpoint === '') {
@@ -62,6 +132,10 @@ function tct_handle_requests() {
     }
 
     $req_path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+    if (!is_string($req_path)) {
+        return;
+    }
+    $req_path = tct_request_path_relative_to_home($req_path);
     if (!is_string($req_path)) {
         return;
     }

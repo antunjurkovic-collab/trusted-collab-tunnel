@@ -4,7 +4,8 @@
 
 | Version | Supported |
 | ------- | --------- |
-| 3.0.0-alpha.5 | GitHub prerelease testing only |
+| 3.0.0-alpha.6 | GitHub prerelease testing only |
+| 3.0.0-alpha.5 | Superseded; known path-prefix routing defect |
 | 3.0.0-alpha.4 | Internal diagnostic testing only |
 | 3.0.0-alpha.3 | Internal alpha review only |
 | 3.0.0-alpha.2 | Internal alpha review only |
@@ -13,7 +14,7 @@
 
 ## Security Notes
 
-Alpha.5 is suitable only for bounded experimental testing. It is not
+Alpha.6 is suitable only for bounded experimental testing. It is not
 production-approved or a claim of universal host, cache, proxy, or CDN
 compatibility.
 

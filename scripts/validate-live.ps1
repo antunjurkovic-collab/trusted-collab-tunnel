@@ -584,7 +584,7 @@ foreach ($check in $checks) {
 $summary = [pscustomobject]@{
     schema = 'tct-external-validator-report-v1'
     ok = ($failed.Count -eq 0)
-    base_url = $baseUri.GetLeftPart([UriPartial]::Authority)
+    base_url = $baseUri.AbsoluteUri.TrimEnd('/')
     checks = $checks.Count
     failed = $failed.Count
     failed_names = @($failed | ForEach-Object { $_.name })
