@@ -1,6 +1,6 @@
 # Alpha.5 Publication Alignment Plan and Evidence
 
-Status: implementation complete; release evidence pending
+Status: release gate passed; mandatory evidence stop
 
 Decision authority: project owner
 
@@ -69,15 +69,57 @@ production deployment work.
 
 ### Release Source
 
-Pending clean source commit and complete acceptance results.
+- Release source commit:
+  `ca8d2c0e426f4bbd1a4e939544236f1de3d44b0f`.
+- `composer test`: **121 tests, 3,422 assertions, all passed**.
+- Static acceptance: **43 checks, all passed**.
+- PHP syntax: passed for all **74** non-vendor PHP source and test files.
+- Focused sitemap/document fixtures: **14 tests, 38 assertions, all passed**.
+- `git diff --check`: passed.
+- Existing exact JCS, Appendix C, representation, conditional-request,
+  resource-boundary, extraction, exposure, and Deployment Doctor vectors all
+  remained accepted.
+- The only core behavior changes are fail-closed handling of an invalid
+  M-Sitemap `sitemaps` member and extension-filter attempts to rewrite
+  adapter-owned sitemap core members.
 
 ### Reproducible Package
 
-Pending clean-commit package build and archive inspection.
+- Artifact: `dist/trusted-collab-tunnel-3.0.0-alpha.5.zip`.
+- Artifact bytes: **97,901**.
+- SHA-256:
+  `e68985cb8e315385052d0632d745969e759bd53d5bc5e70649891fc9b5833869`.
+- Two independently assembled builds from the release source commit were
+  byte-identical.
+- Archive entries: **64** — 63 committed files and one generated manifest.
+- Manifest values:
+  - plugin version: `3.0.0-alpha.5`;
+  - source commit:
+    `ca8d2c0e426f4bbd1a4e939544236f1de3d44b0f`;
+  - draft revision: `draft-jurkovikj-collab-tunnel-03`; and
+  - draft source SHA-256:
+    `d106c6b10fad897b434834d74682bf093e66a0a5aea1dbf116691e301ef692fd`.
+- The required Doctor runtime and bounded external validator are present.
+- No `tests/`, `vendor/`, or nested `dist/` entry is present.
 
 ### Disposable Actual-ZIP Check
 
-Pending proportional validation.
+The retained ZIP was installed with `--force` and activated from the archive
+on an isolated WordPress 7.0.2 / PHP 8.3 Apache lane. Plugin source was not
+bind-mounted. Activation and `wp plugin get` reported `3.0.0-alpha.5`.
+
+| Permalinks | Public outcome | Requests | Samples | Checks | Failed | Response bytes |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Pretty | pass | 16 | 3 | 97 | 0 | 78,990 |
+| Plain | pass | 16 | 3 | 97 | 0 | 78,291 |
+
+Both lanes proved exact profile values, JCS/body validators, digests,
+content lengths, sitemap hint parity, discovery and canonical links,
+conditional `304`, `HEAD`, unsafe method handling, identity-only gzip
+advertisement stability, identity-forbidden `406`, and bounded completion.
+
+All dedicated test containers, volumes, and the Docker network were removed
+after validation.
 
 ## Stop Condition
 
