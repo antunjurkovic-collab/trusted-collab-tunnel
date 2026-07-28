@@ -132,6 +132,9 @@ assembled ZIPs with fixed entry metadata, requires byte identity, retains one
 artifact, and writes its SHA-256 sidecar. The ZIP contains a source/draft/file
 digest manifest. Alpha.5 alignment and packaging evidence is recorded in
 [`docs/ALPHA5_PUBLICATION_ALIGNMENT_PLAN_AND_EVIDENCE.md`](docs/ALPHA5_PUBLICATION_ALIGNMENT_PLAN_AND_EVIDENCE.md).
+The separately tested Pantheon public-delivery lane is characterized
+without a provider-wide claim in
+[`docs/PANTHEON_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md`](docs/PANTHEON_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md).
 
 ## Installation
 

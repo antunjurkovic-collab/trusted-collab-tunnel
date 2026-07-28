@@ -168,6 +168,19 @@ No secret-free administrator JSON export was copied into this repository.
 The owner should retain the serializer-produced export privately; this packet
 does not fabricate or reconstruct it from the rendered page.
 
+### Pantheon Selected-Site Diagnostic
+
+The owner also installed alpha.5 on one disposable Pantheon development site.
+Deployment Doctor runs before and after an explicit Pantheon cache clear
+remained **fail**. The canonical JSON, digests, lengths, links,
+`no-transform`, and identity-selected responses remained sound, while the
+public lane weakened strong ETags, selected gzip coding when gzip was
+advertised, and returned `200` when identity was prohibited.
+
+This exact tested lane is documented as **Incompatible** without making a
+provider-wide claim or authorizing a recipe or implementation:
+[`PANTHEON_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md`](PANTHEON_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md).
+
 ## Stop Condition
 
 Completion of this evidence packet does not publish the package, push the
