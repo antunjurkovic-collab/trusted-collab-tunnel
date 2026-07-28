@@ -141,6 +141,9 @@ compression counterexample are recorded in
 The disposable TasteWP lane and its controlled-artifact comparison are
 recorded without a provider-wide claim in
 [`docs/TASTEWP_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md`](docs/TASTEWP_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md).
+The reproducible Playground CLI pass and the independently reproduced
+WordPress URL-path-prefix routing blocker are recorded in
+[`docs/PLAYGROUND_AND_PATH_PREFIX_ALPHA5_EVIDENCE.md`](docs/PLAYGROUND_AND_PATH_PREFIX_ALPHA5_EVIDENCE.md).
 
 ## Installation
 
@@ -154,4 +157,7 @@ Alpha.5 may be published as a GitHub prerelease for experimental testing after
 its recorded release gate passes. Do not advertise it as production-ready,
 universally cache-compatible, WordPress.org stable, or independently
 interoperable merely because its source suite passes. Run the Deployment
-Doctor on each real public delivery path.
+Doctor on each real public delivery path. Alpha.5 also has a known adapter
+blocker for WordPress installations served below a URL path such as
+`/subsite`; their advertised pretty post/page M-URLs can fail closed with
+`404`. Root-hosted installations are unaffected by that specific finding.

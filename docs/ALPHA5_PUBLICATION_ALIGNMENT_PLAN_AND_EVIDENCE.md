@@ -212,6 +212,21 @@ documented as **Incompatible** without authorizing a provider recipe or code
 change:
 [`TASTEWP_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md`](TASTEWP_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md).
 
+### Playground and URL-Path-Prefix Diagnostic
+
+The exact retained alpha.5 ZIP passed all 97 checks in a deterministic,
+root-hosted WordPress Playground CLI lane. The owner's temporary browser
+Playground scope nevertheless returned `404` for two advertised non-home
+pretty M-URLs. A separate controlled WordPress installation at `/subsite`
+reproduced those pretty-route `404`s while the corresponding
+`?tct_m_url=1` routes returned certified JSON.
+
+The comparison attributes a concrete alpha.5 C-URL reconstruction defect to
+path-prefixed WordPress home URLs; it does not attribute the result to
+PHP.wasm, caching, or compression. The test fixtures, evidence, browser
+diagnostic limits, and mandatory no-repair stop are recorded in
+[`PLAYGROUND_AND_PATH_PREFIX_ALPHA5_EVIDENCE.md`](PLAYGROUND_AND_PATH_PREFIX_ALPHA5_EVIDENCE.md).
+
 ## Stop Condition
 
 Completion of this evidence packet does not publish the package, push the

@@ -82,3 +82,8 @@ are unchanged.
 - Alpha.5 is a non-stable GitHub release candidate. It does not establish
   universal host/cache compatibility, a production support matrix, or
   independent interoperability.
+- Alpha.5 does not support a WordPress public home URL below a path prefix
+  such as `/subsite`. Its non-home pretty M-URL fallback can include that
+  prefix twice during C-URL reconstruction and return `404`. The isolated
+  evidence is recorded in
+  [`PLAYGROUND_AND_PATH_PREFIX_ALPHA5_EVIDENCE.md`](PLAYGROUND_AND_PATH_PREFIX_ALPHA5_EVIDENCE.md).
