@@ -78,6 +78,10 @@ Its read-only Checkpoint 1 Deployment Doctor is implemented internally and is
 accepted by the project owner, packaged in alpha.5, and retained in alpha.6
 for deployment diagnostics. Cache adapters, purges, validated shared-caching
 mode, and provider support claims remain unapproved and unimplemented.
+The required runtime, automated-access, response-preservation, cache, and
+two-vantage deployment envelope—and the recommended controlled-local then
+clean-public W3 Total Cache investigation—are defined in
+[`docs/DEPLOYMENT_ENVELOPE_AND_W3TC_TEST_PLAN.md`](docs/DEPLOYMENT_ENVELOPE_AND_W3TC_TEST_PLAN.md).
 
 Receipts require a runtime `TCT_RECEIPT_HMAC_KEY` of at least 32 bytes. API
 keys can be supplied at runtime through comma-separated `TCT_API_KEYS`, or
