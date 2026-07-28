@@ -1,12 +1,15 @@
 # TCT Deployment Envelope and W3 Total Cache Test Plan
 
-Status: controlled stages complete; public-host confirmation not authorized
+Status: controlled and exact Namecheap public stages complete; no further
+implementation authorized
 
 Plan date: 2026-07-28
 
 Controlled Docker execution evidence is recorded in
 [`W3TC_ALPHA6_CONTROLLED_DOCKER_EVIDENCE.md`](W3TC_ALPHA6_CONTROLLED_DOCKER_EVIDENCE.md).
-That packet stops before public-host confirmation.
+The subsequently authorized exact Namecheap/LiteSpeed public evidence is
+recorded in
+[`NAMECHEAP_W3TC_ALPHA6_PUBLIC_EVIDENCE.md`](NAMECHEAP_W3TC_ALPHA6_PUBLIC_EVIDENCE.md).
 
 ## Decision
 

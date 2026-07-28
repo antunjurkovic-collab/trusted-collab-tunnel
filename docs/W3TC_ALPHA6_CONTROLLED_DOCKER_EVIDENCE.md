@@ -5,6 +5,10 @@ authorized
 
 Evidence date: 2026-07-28
 
+The subsequently authorized exact Namecheap/LiteSpeed public checkpoint is
+recorded in
+[`NAMECHEAP_W3TC_ALPHA6_PUBLIC_EVIDENCE.md`](NAMECHEAP_W3TC_ALPHA6_PUBLIC_EVIDENCE.md).
+
 ## Decision
 
 W3 Total Cache is not inherently incompatible with TCT. The exact tested

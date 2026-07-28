@@ -86,6 +86,10 @@ The completed controlled Alpha.6/W3TC `2.10.3` matrix, exact strict
 pretty- and plain-permalink configurations, negative defaults, lifecycle,
 large-response, and restart evidence are recorded in
 [`docs/W3TC_ALPHA6_CONTROLLED_DOCKER_EVIDENCE.md`](docs/W3TC_ALPHA6_CONTROLLED_DOCKER_EVIDENCE.md).
+The separately authorized public Namecheap/LiteSpeed checkpoint, including
+its host-compatible exclusion array and explicit provider-wide limitations,
+is recorded in
+[`docs/NAMECHEAP_W3TC_ALPHA6_PUBLIC_EVIDENCE.md`](docs/NAMECHEAP_W3TC_ALPHA6_PUBLIC_EVIDENCE.md).
 
 Receipts require a runtime `TCT_RECEIPT_HMAC_KEY` of at least 32 bytes. API
 keys can be supplied at runtime through comma-separated `TCT_API_KEYS`, or
