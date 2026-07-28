@@ -1,6 +1,6 @@
 # Alpha.5 Publication Alignment Plan and Evidence
 
-Status: release gate passed; mandatory evidence stop
+Status: release gate and selected-site diagnostic complete
 
 Decision authority: project owner
 
@@ -121,8 +121,56 @@ advertisement stability, identity-forbidden `406`, and bounded completion.
 All dedicated test containers, volumes, and the Docker network were removed
 after validation.
 
+### Selected-Site Diagnostic
+
+The project owner installed alpha.5 on `https://llmpages.org` and ran the
+administrator-initiated Deployment Doctor. The rendered alpha.5 controller
+included the alpha.5 external-rerun instruction.
+
+- Started: `2026-07-28T10:59:50+00:00`.
+- Completed: `2026-07-28T10:59:56+00:00`.
+- Overall public delivery path: **fail**.
+- Origin implementation: **not tested**.
+- WordPress cache integration: **not tested**.
+
+The ordinary identity path retained exact Draft-03 structure, JCS bytes,
+strong ETags, Content-Digest, Content-Length, discovery links, sitemap hint
+parity, conditional `304`, `HEAD`, unsafe-method handling, and repeated
+stability. The mandatory failures were confined to:
+
+- delivered `Cache-Control` without `no-transform`;
+- a request advertising gzip receiving `Content-Encoding: gzip`;
+- the intermediary weakening the identity ETag for that coded response; and
+- a sitemap request forbidding identity receiving `200` instead of `406`.
+
+The Doctor reported only diagnostic signals—LiteSpeed server software,
+Cloudflare response server, Cloudflare `DYNAMIC` cache status, and LiteSpeed
+`X-Turbo-Charged-By`. Detection is not causal attribution.
+
+The bounded external validator independently reproduced the result:
+
+```text
+schema: tct-external-validator-report-v1
+requests: 16
+sampled_murls: 3
+checks: 97
+failed: 21
+response_bytes: 111222
+elapsed_seconds: 13.745
+exit: 1
+```
+
+Its 21 failures include deterministic cascades from the same three delivery
+conditions: missing `no-transform`, unexpected gzip/weak-validator behavior,
+and failure to preserve identity-forbidden `406`.
+
+No secret-free administrator JSON export was copied into this repository.
+The owner should retain the serializer-produced export privately; this packet
+does not fabricate or reconstruct it from the rendered page.
+
 ## Stop Condition
 
 Completion of this evidence packet does not publish the package, push the
 branch, deploy it to `llmpages.org`, authorize a Worker generation, or open any
-other product slice.
+other product slice. A separate project-owner authorization on 2026-07-28
+opened only the gated review of the optional Draft-03 Worker edge adapter.
