@@ -4,15 +4,24 @@ Tags: ai, crawlers, optimization, bandwidth, machine-readable
 Requires at least: 5.0
 Tested up to: 6.4
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 2.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Reduce AI crawler bandwidth by up to 90% through efficient machine endpoints with sitemap-first verification and zero-fetch optimization.
+Legacy experimental Draft-02 implementation retained for historical review.
 
 == Description ==
 
-Trusted Collaboration Tunnel (TCT) is a lightweight plugin that enables efficient content delivery to AI crawlers and automated agents. By implementing a standardized protocol with template-invariant fingerprinting and conditional request discipline, TCT reduces bandwidth consumption by up to 90% compared to traditional HTML crawling.
+IMPORTANT: This package implements an earlier Draft-02 experiment. It does
+not implement published draft-jurkovikj-collab-tunnel-03 and is not the
+current TCT reference implementation. Former production-site, universal
+compatibility, performance, policy, receipt, and validator statements below
+are historical and have not been re-certified.
+
+This legacy plugin explored efficient content delivery to automated clients
+using machine endpoints, template-invariant fingerprinting, and conditional
+requests. Its behavior and measurements apply to the earlier experiment, not
+to published TCT Draft-03.
 
 **Key Features:**
 
@@ -23,11 +32,11 @@ Trusted Collaboration Tunnel (TCT) is a lightweight plugin that enables efficien
 * **Conditional Request Discipline**: Proper 304 Not Modified responses save bandwidth
 * **Bidirectional Handshake**: Verifiable C-URL ↔ M-URL mapping via Link headers
 
-**Measured Results:**
+**Historical Self-Reported Results (not re-certified):**
 
 * 83% bandwidth savings vs HTML-only crawling
 * 86% token reduction for AI processing
-* 100% protocol compliance across 970+ URLs in production
+* an internal report of complete compliance with the tested earlier profile
 
 **Optional Trust Extensions:**
 
@@ -69,7 +78,9 @@ No. TCT works with any WordPress theme without modifications. Endpoints are auto
 
 = Is this compatible with my existing plugins? =
 
-Yes. TCT integrates cleanly with caching plugins, CDNs, and security tools. It follows WordPress standards and hooks.
+No universal compatibility claim is made for this legacy generation. Cache,
+proxy, CDN, security, and hosting behavior must be validated on the complete
+public delivery path.
 
 = How do AI crawlers discover the TCT endpoints? =
 
@@ -116,7 +127,7 @@ Allow: /*/llm/
 == Screenshots ==
 
 1. TCT Settings page - Configure optional trust extensions
-2. Validator results showing 100% protocol compliance
+2. Historical validator results for the earlier experimental profile
 3. Analytics showing bandwidth savings
 
 == Changelog ==

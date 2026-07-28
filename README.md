@@ -2,6 +2,15 @@
 
 **Version: 2.1.0** | **Specification: draft-jurkovikj-collab-tunnel-02**
 
+> **Legacy generation:** This branch preserves the earlier Draft-02
+> experiment. It does not implement the published
+> [`draft-jurkovikj-collab-tunnel-03`](https://datatracker.ietf.org/doc/draft-jurkovikj-collab-tunnel/03/)
+> and must not be presented or installed as the current TCT reference
+> implementation. The production-site, compatibility, performance, policy,
+> receipt, and validator statements below are historical claims from that
+> experiment and have not been re-certified. A separately versioned WordPress
+> `3.0.0-alpha.5` alignment checkpoint is under review.
+
 A minimal, install-and-go plugin that exposes a deterministic machine endpoint (M_URL) for each canonical page (C_URL), with validator discipline and sitemap-first skip. Optional trust extensions add policy links, access control, and usage receipts.
 
 ## What's New in v2.1.0 (Performance Release)
@@ -71,24 +80,26 @@ This implementation is licensed under **GPL v2+** (see [LICENSE](LICENSE)).
 - Status: Patent Pending
 - Licensing: **Royalty-Free (RF)** under IETF IPR policy (RFC 8179)
 
-The provisional patent application covers the system and methods described in the TCT specification. Under the IETF Intellectual Property Rights policy, a Royalty-Free license is granted to all implementers of the standard.
-
-**Trademark Notice:**
-"Trusted Collaboration Tunnel" and "TCT" are pending trademark applications.
+See [PATENTS.md](PATENTS.md) and the official disclosure record for the
+current public IPR statement. No scale-based licensing distinction is made.
 
 ## Specification & Resources
 
-This plugin implements the Collaboration Tunnel Protocol (TCT):
-- 📄 **Full Specification:** https://github.com/antunjurkovic-collab/collab-tunnel-spec
-- 📦 **Python Client Library:** https://pypi.org/project/collab-tunnel/
-- 🔍 **Protocol Validator:** https://llmpages.org/validator/
+This legacy plugin targeted an earlier Collaboration Tunnel draft:
 
-### Measured Results
-Based on 970 URLs across 3 production sites:
+- **Current published TCT `-03`:** https://datatracker.ietf.org/doc/draft-jurkovikj-collab-tunnel/03/
+- **Specification repository:** https://github.com/antunjurkovic-collab/collab-tunnel-spec
+- **Legacy Python package:** https://pypi.org/project/collab-tunnel/
+
+### Historical Self-Reported Results
+
+The earlier experiment reported the following across 970 URLs on three sites;
+the results are not current TCT `-03` conformance evidence:
+
 - **83% bandwidth savings** (103 KB → 17.7 KB average)
 - **86% token reduction** (13,900 → 1,960 tokens)
 - **90%+ skip rate** for unchanged content
-- **100% protocol compliance**
+- an internal report of complete compliance with the tested earlier profile
 
 ## Protocol Endpoints
 
@@ -98,7 +109,10 @@ Based on 970 URLs across 3 production sites:
 - Headers on M_URL: `Link: <C_URL>; rel="canonical"`, `ETag: "sha256-…"`, `Cache-Control: max-age=0, must-revalidate, stale-while-revalidate=60, stale-if-error=86400`, `Vary: Accept-Encoding`
 - Conditional GET: honors `If-None-Match` and returns `304` (no body) on match; works for HEAD and GET
 
-**Note on ETags and Hash Computation:** This implementation uses TCT Method B (Content-Locked Strong-Content) where the hash is computed from normalized content text, not JSON bytes. This produces template-invariant hashes: the same article content generates the same ETag regardless of HTML presentation or theme changes. All JSON fields are deterministic functions of content, ensuring RFC 9110 compliance for strong ETags. See draft-jurkovikj-collab-tunnel-00 Section "Strong ETag and Parity (Normative)" for detailed semantics.
+**Legacy note on ETags and hash computation:** This implementation uses the
+earlier “Method B” content-locked design. Published TCT `-03` instead binds a
+strong ETag to the exact selected M-URL representation bytes. Do not infer
+`-03` validator compatibility from this implementation.
 
 ### M-URL JSON Response Format (draft-02)
 

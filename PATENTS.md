@@ -1,91 +1,31 @@
 # Patent and Intellectual Property Notice
 
-## Patent Status
+## Software License
 
-This software implements methods and systems covered by:
+The source code in this repository is licensed under the GNU General Public
+License v2.0 or later. See [LICENSE](LICENSE).
 
-**US Provisional Patent Application No. 63/895,763**
-- Title: "Method and System for a Collaborative, Resource-Efficient, and Verifiable Communication Tunnel"
-- Filed: October 8, 2025
-- Status: Patent Pending
-- Applicant: Antun Jurkovikj
+## IETF IPR Disclosure
 
-## Software License vs Patent License
+IETF IPR disclosure
+[7074](https://datatracker.ietf.org/ipr/7074/) is associated with
+`draft-jurkovikj-collab-tunnel`. Consult that record and any later updates for
+the disclosure and licensing statement.
 
-This is important to understand:
+As of 2026-07-28, US Provisional Patent Application No. 63/895,763, filed
+2025-10-08, remains within its provisional pendency. This repository does not
+predict or independently determine its later legal status.
 
-### Software Code: GPL v2+ (Free to Use)
+The former document divided users by deployment scale and implied different
+patent-license requirements. That distinction was inconsistent with the
+Royalty-Free statement in disclosure 7074 and has been removed. This
+repository makes no scale-based implementation or licensing distinction.
 
-The **source code** in this repository is licensed under the **GNU General Public License v2.0 or later (GPL v2+)**.
+## Scope
 
-✅ **You are FREE to:**
-- Use this code on your own website(s)
-- Modify the code
-- Distribute the code
-- Run the code in production
-- Study how it works
+The GPL governs this repository’s software code. The IETF disclosure record
+governs the author’s public disclosure concerning potentially applicable
+patent claims. Neither this summary nor repository issue responses constitute
+legal advice.
 
-**No additional patent license is required** for using this GPL-licensed code on your own website(s).
-
-### Patent Rights: Method and System
-
-The **patent application** covers the underlying **methods and systems** (not the code itself), including:
-- Template-invariant content fingerprinting
-- Sitemap-first verification with content hash comparison
-- Zero-fetch optimization via hash-based skip logic
-- Bidirectional link verification between canonical and machine-readable URLs
-- Conditional request discipline with ETag parity
-
-## Who Needs a Patent License?
-
-### ✅ NO Patent License Required:
-
-- **Website owners** using this plugin on their own sites
-- **Individual developers** modifying or studying the code
-- **Small-scale users** (<10,000 URLs/month)
-- **Open source contributors** improving this GPL code
-- **Researchers** studying the implementation
-
-## Licensing Status
-
-**Royalty-Free (RF) License:**
-
-Under the IETF Intellectual Property Rights policy (RFC 8179), this technology is available to **all implementers** under a perpetual, irrevocable, **Royalty-Free license**.
-
-- ✅ **No commercial licensing fees**
-- ✅ **No restrictions based on scale** (>10K URLs/month or otherwise)
-- ✅ **Available to everyone:** website owners, AI companies, CDN providers, SaaS platforms, technology vendors
-
-**Official IETF IPR Disclosure:** https://datatracker.ietf.org/ipr/7074/
-
-## IETF and Standards Process
-
-If this work proceeds through the IETF standards process:
-
-1. **IPR Disclosure:** All required intellectual property disclosures will be made per **RFC 8179** (IETF Intellectual Property Rights in IETF Technology)
-2. **Licensing Commitment:** The author intends to provide licensing terms compatible with IETF requirements
-3. **Transparency:** All patent-related information will be disclosed to relevant IETF Working Groups
-
-## No Warranty
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. The patent-pending status does not imply any warranty of functionality, merchantability, or fitness for a particular purpose.
-
-## Questions?
-
-### For GPL Software License Questions:
-- See: [LICENSE](LICENSE) file (GPL v2.0)
-- GPL FAQ: https://www.gnu.org/licenses/gpl-faq.html
-
-### For Patent License Questions:
-- Contact: antunjurkovic@gmail.com
-- Include: Use case description, scale, commercial/non-commercial
-
-### For IETF/Standards Questions:
-- See: [collab-tunnel-spec](https://github.com/antunjurkovic-collab/collab-tunnel-spec)
-- IETF IPR Policy: RFC 8179
-
----
-
-**Last Updated:** October 19, 2025
-
-**Disclaimer:** This is a plain-language summary for informational purposes. For legal advice, consult a qualified intellectual property attorney. The GPL v2+ license governs the code; patent rights are a separate matter.
+For legal advice about a particular activity, consult qualified counsel.
