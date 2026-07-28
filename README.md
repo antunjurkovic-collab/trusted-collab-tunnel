@@ -135,6 +135,9 @@ digest manifest. Alpha.5 alignment and packaging evidence is recorded in
 The separately tested Pantheon public-delivery lane is characterized
 without a provider-wide claim in
 [`docs/PANTHEON_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md`](docs/PANTHEON_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md).
+The disposable 64-bit Wasmer lifecycle and its larger-representation
+compression counterexample are recorded in
+[`docs/WASMER_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md`](docs/WASMER_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md).
 
 ## Installation
 

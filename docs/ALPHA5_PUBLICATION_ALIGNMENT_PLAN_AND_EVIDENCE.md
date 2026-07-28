@@ -181,6 +181,20 @@ This exact tested lane is documented as **Incompatible** without making a
 provider-wide claim or authorizing a recipe or implementation:
 [`PANTHEON_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md`](PANTHEON_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md).
 
+### Wasmer Selected-Site Diagnostic
+
+Alpha.5 activated on a separate disposable 64-bit Wasmer WordPress site. Its
+initial administrator Doctor and external validator both passed. A
+create/edit/delete lifecycle then exposed public gzip coding for larger fresh
+JSON responses despite `no-transform`; the small clean state passed again
+after exact cleanup.
+
+The identity mutation lane was sound, but the compression counterexample
+classifies this exact tested lane as **Incompatible** and reveals that
+Alpha.5's first-M-URL gzip sample can miss larger representations. The
+secret-free evidence is recorded without authorizing a Doctor correction:
+[`WASMER_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md`](WASMER_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md).
+
 ## Stop Condition
 
 Completion of this evidence packet does not publish the package, push the
