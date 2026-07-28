@@ -145,6 +145,9 @@ compression counterexample are recorded in
 The disposable TasteWP lane and its controlled-artifact comparison are
 recorded without a provider-wide claim in
 [`docs/TASTEWP_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md`](docs/TASTEWP_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md).
+The same-host W3 Total Cache enabled/disabled comparison and the independently
+observed InfinityFree free-hosting browser-challenge boundary are recorded in
+[`docs/INFINITYFREE_W3TC_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md`](docs/INFINITYFREE_W3TC_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md).
 The reproducible Playground CLI pass and the independently reproduced
 WordPress URL-path-prefix routing blocker are recorded in
 [`docs/PLAYGROUND_AND_PATH_PREFIX_ALPHA5_EVIDENCE.md`](docs/PLAYGROUND_AND_PATH_PREFIX_ALPHA5_EVIDENCE.md).
@@ -160,8 +163,10 @@ activate it. Default core resources are:
 Alpha.6 may be published as a GitHub prerelease for experimental testing after
 its recorded release gate passes. Do not advertise it as production-ready,
 universally cache-compatible, WordPress.org stable, or independently
-interoperable merely because its source suite passes. Run the Deployment
-Doctor on each real public delivery path. Alpha.6 repairs alpha.5's known
-pretty post/page M-URL failure on WordPress installations served below a URL
-path such as `/subsite`; root and path-prefixed installations remain separate
-deployment lanes that must be validated.
+interoperable merely because its source suite passes. Run both the
+site-initiated Deployment Doctor and the independent external validator
+against each selected deployment; their vantages are separate evidence.
+Alpha.6 repairs alpha.5's known pretty post/page M-URL failure on WordPress
+installations served below a URL path such as `/subsite`; root and
+path-prefixed installations remain separate deployment lanes that must be
+validated.
