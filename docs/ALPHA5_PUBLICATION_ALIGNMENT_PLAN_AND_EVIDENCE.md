@@ -195,6 +195,23 @@ Alpha.5's first-M-URL gzip sample can miss larger representations. The
 secret-free evidence is recorded without authorizing a Doctor correction:
 [`WASMER_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md`](WASMER_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md).
 
+### TasteWP Selected-Site Diagnostic
+
+Alpha.5 was also installed on one disposable TasteWP site. The administrator
+Doctor failed, and the packaged external validator independently reproduced
+the result with 28 failed checks out of 97. Canonical identity JSON and
+identity-body digests remained exact, while the public path weakened ETags,
+omitted Content-Length, selected gzip when advertised, and returned `200`
+when identity was prohibited.
+
+The exact retained alpha.5 ZIP had already passed all 97 checks in both
+pretty and plain permalink modes on the controlled WordPress/PHP/Apache lane.
+This comparison supports plugin correctness without attributing the TasteWP
+outcome to a specific public-path component. The exact tested TasteWP lane is
+documented as **Incompatible** without authorizing a provider recipe or code
+change:
+[`TASTEWP_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md`](TASTEWP_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md).
+
 ## Stop Condition
 
 Completion of this evidence packet does not publish the package, push the

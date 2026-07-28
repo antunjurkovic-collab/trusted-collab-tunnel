@@ -138,6 +138,9 @@ without a provider-wide claim in
 The disposable 64-bit Wasmer lifecycle and its larger-representation
 compression counterexample are recorded in
 [`docs/WASMER_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md`](docs/WASMER_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md).
+The disposable TasteWP lane and its controlled-artifact comparison are
+recorded without a provider-wide claim in
+[`docs/TASTEWP_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md`](docs/TASTEWP_ALPHA5_PUBLIC_DELIVERY_EVIDENCE.md).
 
 ## Installation
 
