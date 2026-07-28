@@ -1,8 +1,21 @@
 # Changelog
 
-This file records private WordPress reference checkpoints. It does not imply
-publication, production support, or conformance to an Internet-Draft that has
-not been submitted.
+This file records versioned WordPress reference checkpoints. A checkpoint does
+not imply production support, general host/cache compatibility, or independent
+interoperability.
+
+## 3.0.0-alpha.5 — published Draft-03 release candidate
+
+- Pinned the exact source identity of posted
+  `draft-jurkovikj-collab-tunnel-03`.
+- Replaced private/unpublished product metadata with explicit non-stable public
+  reference status.
+- Rejected the M-Sitemap-Index-only `sitemaps` member in an M-Sitemap.
+- Prevented `tct_sitemap_document` from rewriting certified `version`,
+  `profile`, or validator-bearing `items`; unknown top-level extension members
+  remain permitted and certified.
+- Retained the identity-only response model, routes, representation cache
+  namespace, and read-only Deployment Doctor.
 
 ## 3.0.0-alpha.4 — internal diagnostic test package
 

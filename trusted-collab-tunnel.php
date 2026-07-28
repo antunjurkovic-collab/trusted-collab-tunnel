@@ -1,9 +1,9 @@
 <?php
 /**
- * Plugin Name: Trusted Collaboration Tunnel — Internal Draft-03 Reference
- * Plugin URI: https://llmpages.org
- * Description: Internal reference implementation of the Collaboration Content Transfer Draft-03 HTTP profile.
- * Version: 3.0.0-alpha.4
+ * Plugin Name: Collaboration Content Transfer (TCT) — Draft-03 Reference
+ * Plugin URI: https://github.com/antunjurkovic-collab/trusted-collab-tunnel
+ * Description: Non-stable WordPress reference implementation of the published Collaboration Content Transfer Draft-03 HTTP profile.
+ * Version: 3.0.0-alpha.5
  * Requires at least: 6.0
  * Requires PHP: 8.1
  * Author: Antun Jurkovikj
@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('TCT_VERSION', '3.0.0-alpha.4');
+define('TCT_VERSION', '3.0.0-alpha.5');
 define('TCT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('TCT_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -116,7 +116,7 @@ function tct_refresh_post_identity($post_id, $post, $update) {
     tct_invalidate_post_identity($post_id);
 
     // Alpha.1 metadata/transients are historical implementation details and
-    // are never consulted by the alpha.2/alpha.3/alpha.4 wire generation.
+    // are never consulted by the alpha.2-and-later Draft-03 wire generation.
     delete_post_meta($post_id, '_tct_etag');
     delete_transient('tct_payload_' . $post_id);
 
@@ -293,7 +293,7 @@ function tct_activate_plugin() {
     if (PHP_VERSION_ID < 80100 || PHP_INT_SIZE < 8 || !extension_loaded('mbstring')) {
         wp_die(
             esc_html(
-                'TCT alpha.4 requires 64-bit PHP 8.1 or newer with the mbstring extension.'
+                'TCT alpha.5 requires 64-bit PHP 8.1 or newer with the mbstring extension.'
             )
         );
     }

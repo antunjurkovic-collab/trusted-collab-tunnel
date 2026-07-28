@@ -24,6 +24,10 @@ final class MSitemapDocument implements JsonSerializable
      */
     public static function fromArray(array $value): self
     {
+        if (array_key_exists('sitemaps', $value)) {
+            throw new SchemaException('M-Sitemap must not contain the M-Sitemap Index sitemaps member.');
+        }
+
         if (($value['profile'] ?? null) !== Protocol::M_SITEMAP_PROFILE) {
             throw new SchemaException('M-Sitemap profile must identify exact Draft-03.');
         }

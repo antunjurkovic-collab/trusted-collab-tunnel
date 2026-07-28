@@ -1,18 +1,18 @@
-=== Trusted Collaboration Tunnel — Internal Draft-03 Reference ===
+=== Collaboration Content Transfer (TCT) — Draft-03 Reference ===
 Contributors: antunjurkovic
 Tags: http, json, etag, sitemap
 Requires at least: 6.0
 Requires PHP: 8.1
-Stable tag: 3.0.0-alpha.4
+Stable tag: 3.0.0-alpha.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Private, non-stable WordPress reference implementation for the unpublished
-Collaboration Content Transfer Draft-03.
+Non-stable WordPress reference implementation for published Collaboration
+Content Transfer Internet-Draft revision 03.
 
 == Description ==
 
-This internal alpha exposes publisher-selected machine-facing JSON
+This experimental alpha exposes publisher-selected machine-facing JSON
 representations, a bounded JSON M-Sitemap, strong representation ETags,
 Content-Digest metadata, bidirectional Web links, and conditional GET/HEAD
 behavior.
@@ -20,12 +20,21 @@ behavior.
 It uses exact URI-valued Draft-03 profiles and sends the same RFC 8785 JCS
 identity bytes used to derive each ETag.
 
-This is not a production release. M-Sitemap Index, a public WordPress support
-matrix, and public Draft-03 conformance remain outside this checkpoint.
+This is not a production release. M-Sitemap Index, a general WordPress support
+matrix, and independent interoperability evidence remain outside this checkpoint.
 Policy, receipts, telemetry, changes, llms.txt, and manifest resources are
 non-core experiments disabled or separated from the core contract.
 
 == Changelog ==
+
+= 3.0.0-alpha.5 =
+* Pins the exact source of the posted Collaboration Content Transfer revision 03.
+* Aligns public plugin metadata with the published draft.
+* Rejects the M-Sitemap-Index-only sitemaps member in an M-Sitemap.
+* Prevents extension filters from rewriting certified sitemap core members or
+  current M-URL ETag hints.
+* Retains identity-only delivery, existing routes, and the tct_v03_alpha2 cache
+  namespace.
 
 = 3.0.0-alpha.4 =
 * Retains the alpha.3 Draft-03 wire behavior, routes, and cache generation.

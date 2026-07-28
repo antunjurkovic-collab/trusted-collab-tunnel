@@ -22,9 +22,10 @@ $receipt = Read-File 'includes/Receipt.php'
 $stats = Read-File 'includes/Stats.php'
 $changes = Read-File 'includes/Changes.php'
 $protocol = Read-File 'src/Draft03/Protocol.php'
+$sitemapDocument = Read-File 'src/Draft03/MSitemapDocument.php'
 $jcs = Read-File 'src/Draft03/JcsEncoder.php'
 $readme = Read-File 'README.md'
-$baseline = Read-File 'docs/DRAFT03_INTERNAL_BASELINE.md'
+$baseline = Read-File 'docs/DRAFT03_PUBLISHED_BASELINE.md'
 $doctor = Read-File 'src/Compatibility/Doctor/DeploymentDoctor.php'
 $doctorPreflight = Read-File 'src/Compatibility/Doctor/BoundedJsonPreflight.php'
 $doctorTransport = Read-File 'includes/Compatibility/WordPressHttpTransport.php'
@@ -37,13 +38,15 @@ $packageBuilder = Read-File 'scripts/build-package.ps1'
 $mUrlProfile = 'https://www.ietf.org/archive/id/draft-jurkovikj-collab-tunnel-03.html#tct-m-url-profile'
 $sitemapProfile = 'https://www.ietf.org/archive/id/draft-jurkovikj-collab-tunnel-03.html#tct-m-sitemap-profile'
 
-Add-Check 'version_alpha4' (
-    $main -match 'Version:\s+3\.0\.0-alpha\.4' -and
-    $main -match "define\('TCT_VERSION', '3\.0\.0-alpha\.4'\)"
+Add-Check 'version_alpha5' (
+    $main -match 'Version:\s+3\.0\.0-alpha\.5' -and
+    $main -match "define\('TCT_VERSION', '3\.0\.0-alpha\.5'\)"
 )
 Add-Check 'php_81_floor' ($main -match 'Requires PHP:\s+8\.1')
 Add-Check 'runtime_autoloader' ($main -match "TCT\\\\Draft03\\\\" -and $main -match 'src/Draft03/')
-Add-Check 'baseline_source_digest_pinned' ($baseline -match 'F1B2A1C9C50293C0DF5936F58BABB5F4FAFA895510A4228CA73C71698D2A6159')
+Add-Check 'published_baseline_source_digest_pinned' (
+    $baseline -match 'D106C6B10FAD897B434834D74682BF093E66A0A5AEA1DBF116691E301EF692FD'
+)
 Add-Check 'exact_murl_profile' ($protocol.Contains($mUrlProfile))
 Add-Check 'exact_sitemap_profile' ($protocol.Contains($sitemapProfile))
 Add-Check 'root_index_has_no_obsolete_profile_attribute' (
@@ -109,6 +112,15 @@ Add-Check 'sitemap_hints_from_identity' (
     $sitemap -match '\$identity->catalogEtag\(\)' -and
     $sitemap -notmatch '_tct_etag'
 )
+Add-Check 'sitemap_rejects_index_member' (
+    $sitemapDocument -match "array_key_exists\('sitemaps'" -and
+    $sitemapDocument -match 'must not contain'
+)
+Add-Check 'sitemap_filter_cannot_rewrite_certified_core' (
+    $sitemap -match '\$certified_core' -and
+    $sitemap -match "'version', 'profile', 'items'" -and
+    $sitemap -match 'must not modify version, profile, or items'
+)
 Add-Check 'sitemap_bounded_query' (
     $sitemap -match 'tct_sitemap_max_items' -and
     $sitemap -match '\$maximum_items \+ 1' -and
@@ -154,9 +166,9 @@ Add-Check 'receipt_secret_runtime_only' (
 )
 Add-Check 'stats_writes_opt_in' ($stats -match "get_option\('tct_stats_enabled', 0\)")
 Add-Check 'changes_writes_opt_in' ($changes -match "get_option\('tct_changes_enabled', 0\)")
-Add-Check 'readme_internal_nonstable' (
-    $readme -match '3\.0\.0-alpha\.4' -and
-    $readme -match 'Internal' -and
+Add-Check 'readme_published_nonstable' (
+    $readme -match '3\.0\.0-alpha\.5' -and
+    $readme -match 'published' -and
     $readme -match 'non-stable|not.*production'
 )
 Add-Check 'doctor_additive_runtime_wiring' (
@@ -201,11 +213,12 @@ Add-Check 'external_validator_raw_bounded' (
     $liveValidator -match 'Expand-GzipBounded' -and
     $liveValidator -match 'unexpected_content_coding'
 )
-Add-Check 'alpha4_package_includes_doctor_runtime' (
+Add-Check 'alpha5_package_includes_doctor_runtime' (
     $packageBuilder -match '\^includes/Compatibility/' -and
     $packageBuilder -match '\^src/Compatibility/Doctor/' -and
     $packageBuilder -match 'scripts/validate-live\.ps1' -and
-    $packageBuilder -match 'requiredPackageFiles'
+    $packageBuilder -match 'requiredPackageFiles' -and
+    $packageBuilder -match 'd106c6b10fad897b434834d74682bf093e66a0a5aea1dbf116691e301ef692fd'
 )
 
 $failed = @($checks | Where-Object { -not $_.ok })

@@ -1,11 +1,11 @@
 param(
-    [string]$Version = '3.0.0-alpha.4'
+    [string]$Version = '3.0.0-alpha.5'
 )
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $dist = Join-Path $root 'dist'
-$draftSha256 = 'f1b2a1c9c50293c0df5936f58babb5f4fafa895510a4228ca73c71698d2a6159'
+$draftSha256 = 'd106c6b10fad897b434834d74682bf093e66a0a5aea1dbf116691e301ef692fd'
 
 Push-Location $root
 try {
@@ -47,7 +47,7 @@ try {
     )
     foreach ($required in $requiredPackageFiles) {
         if ($required -notin $packageFiles) {
-            throw "Required alpha.4 runtime or validator file is absent: $required"
+            throw "Required alpha.5 runtime or validator file is absent: $required"
         }
     }
 
@@ -130,8 +130,8 @@ try {
     $manifestBytes = [Text.Encoding]::UTF8.GetBytes($manifestText)
 
     New-Item -ItemType Directory -Path $dist -Force | Out-Null
-    $zipPath = Join-Path $dist "trusted-collab-tunnel-$Version-internal.zip"
-    $proofPath = Join-Path $dist "trusted-collab-tunnel-$Version-internal.proof.zip"
+    $zipPath = Join-Path $dist "trusted-collab-tunnel-$Version.zip"
+    $proofPath = Join-Path $dist "trusted-collab-tunnel-$Version.proof.zip"
     foreach ($path in @($zipPath, $proofPath)) {
         if (Test-Path -LiteralPath $path) {
             Remove-Item -LiteralPath $path -Force

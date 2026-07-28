@@ -1,6 +1,6 @@
 {
     "name": "antunjurkovic/trusted-collab-tunnel",
-    "description": "Internal WordPress reference implementation of Collaboration Content Transfer Draft-03.",
+    "description": "Non-stable WordPress reference implementation of published Collaboration Content Transfer Draft-03.",
     "type": "wordpress-plugin",
     "license": "GPL-2.0-or-later",
     "require": {

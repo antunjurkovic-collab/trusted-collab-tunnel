@@ -105,6 +105,18 @@ final class DocumentTest extends TestCase
         ]);
     }
 
+    public function testSitemapRejectsIndexMember(): void
+    {
+        $this->expectException(SchemaException::class);
+        $this->expectExceptionMessage('must not contain');
+        MSitemapDocument::fromArray([
+            'version' => 2,
+            'profile' => Protocol::M_SITEMAP_PROFILE,
+            'items' => [],
+            'sitemaps' => [],
+        ]);
+    }
+
     public function testSitemapRejectsImpossibleRfc3339Date(): void
     {
         $this->expectException(SchemaException::class);

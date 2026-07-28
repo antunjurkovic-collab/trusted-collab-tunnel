@@ -4,6 +4,7 @@
 
 | Version | Supported |
 | ------- | --------- |
+| 3.0.0-alpha.5 | GitHub prerelease testing only |
 | 3.0.0-alpha.4 | Internal diagnostic testing only |
 | 3.0.0-alpha.3 | Internal alpha review only |
 | 3.0.0-alpha.2 | Internal alpha review only |
@@ -12,7 +13,9 @@
 
 ## Security Notes
 
-This draft-03 alignment branch is not production-approved yet.
+Alpha.5 is suitable only for bounded experimental testing. It is not
+production-approved or a claim of universal host, cache, proxy, or CDN
+compatibility.
 
 Core guidance:
 
@@ -36,7 +39,8 @@ API key extension:
 - Comma-separated plaintext runtime keys can be supplied with `TCT_API_KEYS`;
   environment configuration remains the deployer's secret-management
   responsibility.
-- Legacy `tct_api_keys` plaintext option values are not consulted by alpha.2.
+- Legacy `tct_api_keys` plaintext option values are not consulted by
+  alpha.2-and-later Draft-03 generations.
 
 Operational notes:
 

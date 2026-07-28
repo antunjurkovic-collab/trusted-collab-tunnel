@@ -216,6 +216,33 @@ namespace TCT\Tests\WordPress {
             \tct_build_sitemap_identity();
         }
 
+        public function testSitemapFilterCannotRewriteCertifiedCore(): void
+        {
+            $GLOBALS['tct_test_filters']['tct_sitemap_document'] =
+                static function(array $value): array {
+                    $value['items'][0]['etag'] = 'sha256-' . str_repeat('b', 64);
+                    return $value;
+                };
+
+            $this->expectException(\TCT\Draft03\SchemaException::class);
+            $this->expectExceptionMessage('must not modify');
+            \tct_build_sitemap_identity();
+        }
+
+        public function testSitemapFilterCanAddCertifiedExtensionMember(): void
+        {
+            $GLOBALS['tct_test_filters']['tct_sitemap_document'] =
+                static function(array $value): array {
+                    $value['extension'] = ['enabled' => true];
+                    return $value;
+                };
+
+            $sitemap = \tct_build_sitemap_identity();
+            $value = json_decode($sitemap->body, true, flags: JSON_THROW_ON_ERROR);
+
+            self::assertSame(['enabled' => true], $value['extension']);
+        }
+
         private function post(int $id, string $type): object
         {
             return (object) [

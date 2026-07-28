@@ -3,7 +3,7 @@ if (!defined('ABSPATH')) { exit; }
 
 add_action('admin_menu', static function() {
     add_options_page(
-        'Trusted Collaboration Tunnel',
+        'Collaboration Content Transfer (TCT)',
         'TCT',
         'manage_options',
         'tct-settings',
@@ -99,7 +99,7 @@ function tct_render_settings_page() {
             );
 
             tct_invalidate_protocol_generation();
-            $notice = $error === '' ? 'Internal reference settings saved.' : '';
+            $notice = $error === '' ? 'TCT reference settings saved.' : '';
         }
     }
 
@@ -116,10 +116,10 @@ function tct_render_settings_page() {
     unset($receipt_key);
     ?>
     <div class="wrap">
-        <h1>Trusted Collaboration Tunnel</h1>
+        <h1>Collaboration Content Transfer (TCT)</h1>
         <p>
-            Internal, non-stable WordPress reference implementation for the current
-            unpublished Collaboration Content Transfer Draft-03.
+            Non-stable WordPress reference implementation for the published
+            Collaboration Content Transfer Internet-Draft revision 03.
         </p>
 
         <?php if ($notice !== ''): ?>
@@ -241,7 +241,7 @@ function tct_render_settings_page() {
                 </tr>
             </table>
 
-            <?php submit_button('Save Internal Reference Settings'); ?>
+            <?php submit_button('Save TCT Reference Settings'); ?>
         </form>
 
         <h2>Protocol Identities</h2>

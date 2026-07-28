@@ -148,14 +148,21 @@ function tct_build_sitemap_identity() {
         throw new \RuntimeException('M-Sitemap contains duplicate M-URLs.');
     }
 
-    $value = [
+    $certified_core = [
         'version' => \TCT\Draft03\Protocol::M_SITEMAP_VERSION,
         'profile' => \TCT\Draft03\Protocol::M_SITEMAP_PROFILE,
         'items' => $items,
     ];
-    $value = apply_filters('tct_sitemap_document', $value);
+    $value = apply_filters('tct_sitemap_document', $certified_core);
     if (!is_array($value)) {
         throw new \TCT\Draft03\SchemaException('Sitemap document filter must return an object.');
+    }
+    foreach (['version', 'profile', 'items'] as $member) {
+        if (!array_key_exists($member, $value) || $value[$member] !== $certified_core[$member]) {
+            throw new \TCT\Draft03\SchemaException(
+                'Sitemap document filter must not modify version, profile, or items.'
+            );
+        }
     }
 
     $document = \TCT\Draft03\MSitemapDocument::fromArray($value);
