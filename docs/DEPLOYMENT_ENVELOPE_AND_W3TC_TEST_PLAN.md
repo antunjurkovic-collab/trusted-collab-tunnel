@@ -1,8 +1,12 @@
 # TCT Deployment Envelope and W3 Total Cache Test Plan
 
-Status: documentation-first discovery plan; no implementation authorized
+Status: controlled stages complete; public-host confirmation not authorized
 
 Plan date: 2026-07-28
+
+Controlled Docker execution evidence is recorded in
+[`W3TC_ALPHA6_CONTROLLED_DOCKER_EVIDENCE.md`](W3TC_ALPHA6_CONTROLLED_DOCKER_EVIDENCE.md).
+That packet stops before public-host confirmation.
 
 ## Decision
 
@@ -262,9 +266,10 @@ The first W3 Total Cache evidence lane may conclude:
 
 A local pass alone is controlled evidence, not a public `Verified` claim.
 
-## Recommended First Milestone
+## Completed First Milestone
 
-Authorize, separately, only the controlled local Docker stages A through C:
+After separate user authorization, only the controlled local Docker stages A
+through C were executed:
 
 - no adapter;
 - no automatic settings mutation;
@@ -274,12 +279,15 @@ Authorize, separately, only the controlled local Docker stages A through C:
 - no package-version change; and
 - mandatory evidence stop before choosing a public host.
 
-If strict exclusions pass locally, review the generated recipe and evidence
-before authorizing the clean disposable public confirmation.
+The strict pretty- and plain-permalink configurations passed. Review the
+linked evidence packet before considering a separately authorized clean
+disposable public confirmation. No public-host test is authorized by this
+checkpoint.
 
 ## Stop
 
-This plan changes no plugin source, package, cache settings, live website,
-host, route, Worker, CDN, or retained artifact. It does not authorize W3 Total
-Cache installation or testing, an adapter, alpha.7, repackaging, deployment,
+The completed milestone changed only disposable local Docker resources, which
+were removed. It changed no plugin source, package, live website, retained
+artifact, public host, Worker, or CDN. This checkpoint does not authorize
+further W3 Total Cache testing, an adapter, alpha.7, repackaging, deployment,
 or a compatibility claim.

@@ -82,6 +82,10 @@ The required runtime, automated-access, response-preservation, cache, and
 two-vantage deployment envelope—and the recommended controlled-local then
 clean-public W3 Total Cache investigation—are defined in
 [`docs/DEPLOYMENT_ENVELOPE_AND_W3TC_TEST_PLAN.md`](docs/DEPLOYMENT_ENVELOPE_AND_W3TC_TEST_PLAN.md).
+The completed controlled Alpha.6/W3TC `2.10.3` matrix, exact strict
+pretty- and plain-permalink configurations, negative defaults, lifecycle,
+large-response, and restart evidence are recorded in
+[`docs/W3TC_ALPHA6_CONTROLLED_DOCKER_EVIDENCE.md`](docs/W3TC_ALPHA6_CONTROLLED_DOCKER_EVIDENCE.md).
 
 Receipts require a runtime `TCT_RECEIPT_HMAC_KEY` of at least 32 bytes. API
 keys can be supplied at runtime through comma-separated `TCT_API_KEYS`, or
