@@ -8,8 +8,10 @@
 > and must not be presented or installed as the current TCT reference
 > implementation. The production-site, compatibility, performance, policy,
 > receipt, and validator statements below are historical claims from that
-> experiment and have not been re-certified. A separately versioned WordPress
-> `3.0.0-alpha.5` alignment checkpoint is under review.
+> experiment and have not been re-certified. The separately versioned
+> WordPress `3.0.0-alpha.6` Draft-03 reference is published only as an
+> experimental prerelease; see
+> [GitHub Releases](https://github.com/antunjurkovic-collab/trusted-collab-tunnel/releases).
 
 A minimal, install-and-go plugin that exposes a deterministic machine endpoint (M_URL) for each canonical page (C_URL), with validator discipline and sitemap-first skip. Optional trust extensions add policy links, access control, and usage receipts.
 
