@@ -1,23 +1,77 @@
 # Collaboration Content Transfer (TCT) — Draft-03 WordPress Reference
 
-Version `3.0.0-alpha.6` is a non-stable WordPress reference implementation for
-the [published Collaboration Content Transfer Internet-Draft revision
-03](https://datatracker.ietf.org/doc/draft-jurkovikj-collab-tunnel/03/).
-It is a release candidate for public experimental testing, not a production
-release or the older Draft-02 plugin generation.
+TCT lets a publisher expose deterministic, machine-facing JSON for selected
+WordPress pages without replacing the human-facing website. Each participating
+page advertises its machine-facing counterpart, while a JSON catalog lets a
+client discover the available representations and their current validator
+hints. Strong ETags and ordinary conditional HTTP requests let a client avoid
+retransferring unchanged content.
 
-The immutable alpha.1 reconstruction is tagged
-`tct-wordpress-v3.0.0-alpha.1-internal`. Alpha.2 introduced the additive,
-substantially reworked internal Draft-03 generation pinned in
-[`docs/DRAFT03_INTERNAL_BASELINE.md`](docs/DRAFT03_INTERNAL_BASELINE.md).
-Alpha.3 retained its exact protocol behavior and `tct_v03_alpha2` cache
-namespace while clarifying cache administration. Alpha.4 retained that wire
-generation and added the bounded, administrator-initiated, read-only
-Deployment Doctor. Alpha.5 pins the exact posted `-03` text, aligns public
-metadata, and closes two fail-closed M-Sitemap extension boundaries. Alpha.6
-repairs pretty M-URL routing when the configured WordPress home URL has a path
-prefix, without changing the Draft-03 representation generation. See
-[`docs/DRAFT03_PUBLISHED_BASELINE.md`](docs/DRAFT03_PUBLISHED_BASELINE.md).
+Version `3.0.0-alpha.6` implements the
+[published Collaboration Content Transfer Internet-Draft revision
+03](https://datatracker.ietf.org/doc/draft-jurkovikj-collab-tunnel/03/). It is
+a non-stable reference implementation for governed experimental testing, not a
+production release, crawler authorization system, content-use policy, or the
+older Draft-02 plugin generation.
+
+## How TCT Works
+
+```text
+Human-facing page (C-URL)
+    └── rel="alternate" ──> deterministic JSON representation (M-URL)
+
+Origin root
+    └── rel="index" ─────> machine sitemap (M-Sitemap)
+                               └── lists C-URL, M-URL and optional ETag hint
+
+Client revisit
+    └── If-None-Match ───> 304 Not Modified when the M-URL is unchanged
+```
+
+The WordPress adapter derives the machine-facing content from saved post
+source rather than request-specific theme rendering. TCT defines the delivery
+and validation mechanism; it does not grant a bot permission to crawl or use
+the content.
+
+## Quick Start
+
+Use a disposable or explicitly governed WordPress installation:
+
+1. Confirm 64-bit PHP 8.1 or newer, WordPress 6.0 or newer, and the PHP
+   `mbstring` extension.
+2. Download `trusted-collab-tunnel-3.0.0-alpha.6.zip` from the
+   [Alpha.6 GitHub prerelease](https://github.com/antunjurkovic-collab/trusted-collab-tunnel/releases/tag/tct-wordpress-v3.0.0-alpha.6).
+   Do not substitute GitHub's automatically generated source archives.
+3. In WordPress, select **Plugins → Add New Plugin → Upload Plugin**, upload
+   the ZIP, and activate it.
+4. Publish or select a publicly viewable post or page.
+5. Open `/llm-sitemap.json` and then open one of the listed `mUrl` values.
+6. Select **Settings → TCT Compatibility** and run the Deployment Doctor.
+
+A normal identity response is exact `application/json`, carries a quoted
+strong `"sha256-..."` ETag, and includes `Content-Digest`. The Doctor also
+checks discovery, conditional requests, response stability, method handling,
+identity negotiation, and one selected M-URL.
+
+A Doctor pass is bounded evidence for the sampled resources, deployment,
+vantage, and time. It is not a universal compatibility or production-support
+claim. After extracting the package on an external Windows machine, an
+additional validator can be run only against a disposable installation:
+
+```powershell
+& ./scripts/validate-live.ps1 -BaseUrl 'https://disposable.example'
+```
+
+## Protocol and Code Map
+
+- The protocol specification is the published individual
+  [Draft-03 Internet-Draft](https://datatracker.ietf.org/doc/draft-jurkovikj-collab-tunnel/03/).
+- Framework-independent protocol DTOs, validation, canonicalization, ETags,
+  digests, conditional matching, and identity negotiation are under
+  [`src/Draft03/`](src/Draft03/).
+- WordPress extraction, exposure policy, routing, caching, discovery, and
+  response adapters are under [`includes/`](includes/).
+- Deployment findings and checkpoint evidence are under [`docs/`](docs/).
 
 ## Core Surface
 
@@ -58,6 +112,12 @@ under `includes/`.
   [`docs/ALPHA2_CHECKPOINT_PLAN_AND_EVIDENCE.md`](docs/ALPHA2_CHECKPOINT_PLAN_AND_EVIDENCE.md).
   This does not establish general production support. Every selected origin,
   WordPress cache, proxy, and CDN delivery path must be validated independently.
+- The built-in WordPress adapter does not emit floating-point values or
+  explicit PHP object instances. The generic encoder currently relies on
+  `serialize_precision=-1` for ECMAScript-compatible float digits and does not
+  preserve the identity of empty or sequential-key PHP objects. Custom
+  float/object extensions and standalone reuse of the encoder are outside the
+  accepted Alpha.6 surface.
 
 ## Non-Core Experiments
 
@@ -131,12 +191,6 @@ same-origin redirects, deterministic outcomes, strict report-size parity,
 pre-allocation JSON depth/node checks, gzip expansion, owner-scoped evidence,
 and constrained-memory subprocess completion.
 
-Run the live validator only against a disposable installation:
-
-```powershell
-& ./scripts/validate-live.ps1 -BaseUrl 'https://disposable.example'
-```
-
 The alpha.6 package includes this script for an external Windows rerun. Extract
 the package locally before running it; the WordPress administrator page does
 not execute the script on the server.
@@ -164,21 +218,34 @@ The reproducible Playground CLI pass and the independently reproduced
 WordPress URL-path-prefix routing blocker are recorded in
 [`docs/PLAYGROUND_AND_PATH_PREFIX_ALPHA5_EVIDENCE.md`](docs/PLAYGROUND_AND_PATH_PREFIX_ALPHA5_EVIDENCE.md).
 
-## Installation
+## Release Lineage
 
-Copy the runtime package to `wp-content/plugins/trusted-collab-tunnel/` and
-activate it. Default core resources are:
+The immutable alpha.1 reconstruction is tagged
+`tct-wordpress-v3.0.0-alpha.1-internal`. Alpha.2 introduced the additive,
+substantially reworked internal Draft-03 generation pinned in
+[`docs/DRAFT03_INTERNAL_BASELINE.md`](docs/DRAFT03_INTERNAL_BASELINE.md).
+Alpha.3 retained its exact protocol behavior and `tct_v03_alpha2` cache
+namespace while clarifying cache administration. Alpha.4 retained that wire
+generation and added the bounded, administrator-initiated, read-only
+Deployment Doctor. Alpha.5 pins the exact posted `-03` text, aligns public
+metadata, and closes two fail-closed M-Sitemap extension boundaries.
 
-- `/llm-sitemap.json`
-- `/{canonical}/llm/`
+Alpha.6 is published as a GitHub prerelease for experimental testing. It
+repairs alpha.5's known pretty post/page M-URL failure on WordPress
+installations served below a URL path such as `/subsite`, without changing the
+Draft-03 representation generation. Root and path-prefixed installations
+remain separate deployment lanes that must be validated. See
+[`docs/DRAFT03_PUBLISHED_BASELINE.md`](docs/DRAFT03_PUBLISHED_BASELINE.md) and
+the [exact Alpha.6 release](https://github.com/antunjurkovic-collab/trusted-collab-tunnel/releases/tag/tct-wordpress-v3.0.0-alpha.6).
 
-Alpha.6 may be published as a GitHub prerelease for experimental testing after
-its recorded release gate passes. Do not advertise it as production-ready,
-universally cache-compatible, WordPress.org stable, or independently
-interoperable merely because its source suite passes. Run both the
-site-initiated Deployment Doctor and the independent external validator
-against each selected deployment; their vantages are separate evidence.
-Alpha.6 repairs alpha.5's known pretty post/page M-URL failure on WordPress
-installations served below a URL path such as `/subsite`; root and
-path-prefixed installations remain separate deployment lanes that must be
-validated.
+Do not advertise Alpha.6 as production-ready, universally cache-compatible,
+WordPress.org stable, or independently interoperable merely because its source
+suite passes. Run both the site-initiated Deployment Doctor and independent
+external validator against each selected deployment; their vantages are
+separate evidence.
+
+## Licensing and IPR
+
+Repository code is GPL-2.0-or-later. [`PATENTS.md`](PATENTS.md) points to the
+associated public IETF IPR disclosure without adding to or replacing its
+terms.
